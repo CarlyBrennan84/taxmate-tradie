@@ -3,7 +3,7 @@ import * as ChartLib from "chart.js";
 import {
   LayoutDashboard, Receipt, Car, Wrench, Shirt, HardHat, Smartphone,
   GraduationCap, FileText, UploadCloud, Plus, Trash2, ChevronRight, Menu,
-  Download, Printer, TrendingUp, Gauge, MapPin, Sparkles, ChevronDown,
+  Download, Printer, TrendingUp, Gauge, MapPin, Sparkles,
   Check, CheckCircle2, AlertTriangle, ArrowRight, Fuel, Upload, ShieldCheck, X,
 } from "lucide-react";
 import type { AppData, Receipt as ReceiptT, Trip, CategoryKey } from "./types";
@@ -187,38 +187,6 @@ function ChartCanvas({ type, data, options, heightClass = "h-56" }: { type: "bar
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sig]);
   return <div className={heightClass}><canvas ref={canvasRef} /></div>;
-}
-
-function RefundGauge({ value, max }: { value: number; max: number }) {
-  const pct = Math.max(0, Math.min(1, max > 0 ? value / max : 0));
-  const r = 84;
-  const circumference = Math.PI * r;
-  const [animated, setAnimated] = useState(0);
-  useEffect(() => {
-    const t = setTimeout(() => setAnimated(pct), 120);
-    return () => clearTimeout(t);
-  }, [pct]);
-  return (
-    <div className="relative flex flex-col items-center justify-center pt-2">
-      <svg width="220" height="130" viewBox="0 0 220 130">
-        <path d="M 20 110 A 90 90 0 0 1 200 110" fill="none" stroke="#EEF0F4" strokeWidth={14} strokeLinecap="round" />
-        <path
-          d="M 20 110 A 90 90 0 0 1 200 110"
-          fill="none"
-          stroke={TEAL}
-          strokeWidth={14}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={circumference * (1 - animated)}
-          style={{ transition: "stroke-dashoffset 1s cubic-bezier(0.22, 1, 0.36, 1)" }}
-        />
-      </svg>
-      <div className="absolute top-[52px] flex flex-col items-center">
-        <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: NAVY_SOFT }}>Estimated Refund</span>
-        <span className="text-[34px] font-bold leading-tight" style={{ color: NAVY }}><AnimatedNumber value={value} /></span>
-      </div>
-    </div>
-  );
 }
 
 function Dropzone({ onFiles, disabled }: { onFiles: (files: File[]) => void; disabled?: boolean }) {
@@ -542,7 +510,6 @@ export default function App() {
   const [receiptCategoryFilter, setReceiptCategoryFilter] = useState<CategoryKey | "all">("all");
   const [showTripForm, setShowTripForm] = useState(false);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
-  const [showEstimator, setShowEstimator] = useState(false);
   const [demoMode, setDemoMode] = useState<boolean>(() => loadDemoFlag());
   const [csvPreview, setCsvPreview] = useState<Trip[] | null>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
@@ -717,7 +684,7 @@ export default function App() {
     { key: "odometer", label: "Enter opening odometer", done: (Number(activeData.profile.vehicle.openingOdometer) || 0) > 0, onGo: () => setTab("vehicle") },
     { key: "receipt", label: "Upload your first receipt", done: receiptsWithNum.length > 0, onGo: () => setTab("receipts") },
     { key: "logbook", label: "Start your 12-week logbook", done: trips.length > 0, onGo: () => setTab("vehicle") },
-    { key: "income", label: "Add income & tax withheld", done: income > 0 && withheld > 0, onGo: () => { setTab("overview"); setShowEstimator(true); } },
+    { key: "income", label: "Add tax withheld", done: withheld > 0, onGo: () => setTab("expenses") },
   ];
 
   const quickActions = [
@@ -823,59 +790,27 @@ export default function App() {
 
               <SetupCard steps={setupSteps} />
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                <Card className="lg:col-span-1 p-6 flex flex-col items-center" delay={0}>
-                  <RefundGauge value={Math.max(0, estimatedRefund)} max={Math.max(3000, Math.abs(estimatedRefund) * 1.4)} />
-                  <div className="w-full grid grid-cols-2 gap-2 mt-4">
-                    <div className="p-2.5 rounded-xl text-center" style={{ backgroundColor: "#FBFBFC" }}>
-                      <div className="text-[10px] leading-tight" style={{ color: "#8A93A3" }}>Taxable income after deductions</div>
-                      <div className="text-sm font-semibold tabular mt-0.5" style={{ color: NAVY }}>{fmt(Math.max(0, income - totalDeductions))}</div>
-                    </div>
-                    <div className="p-2.5 rounded-xl text-center" style={{ backgroundColor: "#FBFBFC" }}>
-                      <div className="text-[10px] leading-tight" style={{ color: "#8A93A3" }}>Tax saved from deductions</div>
-                      <div className="text-sm font-semibold tabular mt-0.5" style={{ color: TEAL_DARK }}>{fmt(deductionSaving)}</div>
-                    </div>
-                    <div className="p-2.5 rounded-xl text-center col-span-2" style={{ backgroundColor: "#FBFBFC" }}>
-                      <div className="text-[10px] leading-tight" style={{ color: "#8A93A3" }}>Total tax withheld</div>
-                      <div className="text-sm font-semibold tabular mt-0.5" style={{ color: NAVY }}>{fmt(withheld)}</div>
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-center mt-3 leading-relaxed max-w-[240px]" style={{ color: "#B7BEC9" }}>Estimate only, based on simplified 2024–25-style tax brackets. Not tax advice — confirm with a registered tax agent.</p>
-                  <button onClick={() => setShowEstimator((v) => !v)} className="mt-3 text-xs font-semibold flex items-center gap-1" style={{ color: TEAL_DARK }}>
-                    {showEstimator ? "Hide" : "Edit"} refund estimator <ChevronDown size={13} style={{ transform: showEstimator ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
-                  </button>
-                  {showEstimator && (
-                    <div className="w-full grid grid-cols-2 gap-3 mt-4 pt-4 border-t" style={{ borderColor: GREY_LINE }}>
-                      <Field label="Your name"><input disabled={demoMode} value={activeData.profile.name} onChange={(e) => setProfile("name", e.target.value)} placeholder="Optional" className={inputCls} /></Field>
-                      <Field label="Occupation"><input disabled={demoMode} value={activeData.profile.occupation} onChange={(e) => setProfile("occupation", e.target.value)} className={inputCls} /></Field>
-                      <Field label="Gross income ($/yr)"><input disabled={demoMode} type="number" value={activeData.profile.income} onChange={(e) => setProfile("income", Number(e.target.value))} className={inputCls} /></Field>
-                      <Field label="Tax withheld ($)"><input disabled={demoMode} type="number" value={activeData.profile.taxWithheld} onChange={(e) => setProfile("taxWithheld", Number(e.target.value))} className={inputCls} /></Field>
-                    </div>
-                  )}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+                <Card className="p-5" delay={60}>
+                  <div className="flex items-center justify-between mb-2"><span className="text-xs font-medium" style={{ color: "#8A93A3" }}>Total Deductions</span><TrendingUp size={15} color={TEAL} /></div>
+                  <div className="text-2xl font-bold tabular" style={{ color: NAVY }}><AnimatedNumber value={totalDeductions} /></div>
+                  <div className="text-xs mt-1" style={{ color: "#8A93A3" }}>from {fmt(totalSpend)} logged spend{laundryAdded ? ` + ${fmt(laundryEstimate)} laundry` : ""}</div>
                 </Card>
-
-                <div className="lg:col-span-2 grid grid-cols-2 gap-5">
-                  <Card className="p-5" delay={60}>
-                    <div className="flex items-center justify-between mb-2"><span className="text-xs font-medium" style={{ color: "#8A93A3" }}>Total Deductions</span><TrendingUp size={15} color={TEAL} /></div>
-                    <div className="text-2xl font-bold tabular" style={{ color: NAVY }}><AnimatedNumber value={totalDeductions} /></div>
-                    <div className="text-xs mt-1" style={{ color: "#8A93A3" }}>from {fmt(totalSpend)} logged spend{laundryAdded ? ` + ${fmt(laundryEstimate)} laundry` : ""}</div>
-                  </Card>
-                  <Card className="p-5" delay={100}>
-                    <div className="flex items-center justify-between mb-2"><span className="text-xs font-medium" style={{ color: "#8A93A3" }}>Receipts Logged</span><Receipt size={15} color={TEAL} /></div>
-                    <div className="text-2xl font-bold tabular" style={{ color: NAVY }}>{receiptsWithNum.length}</div>
-                    <div className="text-xs mt-1" style={{ color: "#8A93A3" }}>{unfiledCount} awaiting details</div>
-                  </Card>
-                  <Card className="p-5" delay={140}>
-                    <div className="flex items-center justify-between mb-2"><span className="text-xs font-medium" style={{ color: "#8A93A3" }}>Business Km Share</span><MapPin size={15} color={TEAL} /></div>
-                    <div className="text-2xl font-bold tabular" style={{ color: NAVY }}>{businessPct}%</div>
-                    <div className="text-xs mt-1" style={{ color: "#8A93A3" }}>{Math.round(businessKm)} km of {Math.round(totalKm)} km logged</div>
-                  </Card>
-                  <Card className="p-5" delay={180}>
-                    <div className="flex items-center justify-between mb-2"><span className="text-xs font-medium" style={{ color: "#8A93A3" }}>ATO Readiness</span><ShieldCheck size={15} color={TEAL} /></div>
-                    <div className="text-2xl font-bold tabular" style={{ color: NAVY }}>{readinessScore}/{readinessChecks.length}</div>
-                    <div className="w-full h-1.5 rounded-full bg-[#EEF0F4] mt-2 overflow-hidden"><div className="h-full rounded-full transition-all duration-700" style={{ width: `${(readinessScore / readinessChecks.length) * 100}%`, backgroundColor: TEAL }} /></div>
-                  </Card>
-                </div>
+                <Card className="p-5" delay={100}>
+                  <div className="flex items-center justify-between mb-2"><span className="text-xs font-medium" style={{ color: "#8A93A3" }}>Receipts Logged</span><Receipt size={15} color={TEAL} /></div>
+                  <div className="text-2xl font-bold tabular" style={{ color: NAVY }}>{receiptsWithNum.length}</div>
+                  <div className="text-xs mt-1" style={{ color: "#8A93A3" }}>{unfiledCount} awaiting details</div>
+                </Card>
+                <Card className="p-5" delay={140}>
+                  <div className="flex items-center justify-between mb-2"><span className="text-xs font-medium" style={{ color: "#8A93A3" }}>Business Km Share</span><MapPin size={15} color={TEAL} /></div>
+                  <div className="text-2xl font-bold tabular" style={{ color: NAVY }}>{businessPct}%</div>
+                  <div className="text-xs mt-1" style={{ color: "#8A93A3" }}>{Math.round(businessKm)} km of {Math.round(totalKm)} km logged</div>
+                </Card>
+                <Card className="p-5" delay={180}>
+                  <div className="flex items-center justify-between mb-2"><span className="text-xs font-medium" style={{ color: "#8A93A3" }}>ATO Readiness</span><ShieldCheck size={15} color={TEAL} /></div>
+                  <div className="text-2xl font-bold tabular" style={{ color: NAVY }}>{readinessScore}/{readinessChecks.length}</div>
+                  <div className="w-full h-1.5 rounded-full bg-[#EEF0F4] mt-2 overflow-hidden"><div className="h-full rounded-full transition-all duration-700" style={{ width: `${(readinessScore / readinessChecks.length) * 100}%`, backgroundColor: TEAL }} /></div>
+                </Card>
               </div>
 
               <div>
@@ -1060,6 +995,14 @@ export default function App() {
                   </button>
                 ))}
               </div>
+
+              <Card className="p-5">
+                <SectionTitle title="Your details" eyebrow="Used for your accountant summary" />
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Your name"><input disabled={demoMode} value={activeData.profile.name} onChange={(e) => setProfile("name", e.target.value)} placeholder="Optional" className={inputCls} /></Field>
+                  <Field label="Tax withheld ($)"><input disabled={demoMode} type="number" value={activeData.profile.taxWithheld} onChange={(e) => setProfile("taxWithheld", Number(e.target.value))} className={inputCls} /></Field>
+                </div>
+              </Card>
 
               <Card className="p-5">
                 <SectionTitle title="Other common deductions" eyebrow="No receipts needed under ATO thresholds" />
