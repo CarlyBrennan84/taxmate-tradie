@@ -60,6 +60,7 @@ export const SAMPLE_DATA: AppData = {
     phoneWorkPct: 40,
     laundryEstimate: 120,
     vehicle: { make: "Toyota", model: "HiLux", rego: "1AB2CD", openingOdometer: 45210 },
+    quickSetupDone: true,
   },
   receipts: sampleReceipts,
   trips: buildSampleTrips(),

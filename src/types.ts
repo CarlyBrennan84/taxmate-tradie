@@ -43,6 +43,7 @@ export interface Profile {
   phoneWorkPct: number;
   laundryEstimate: number;
   vehicle: VehicleDetails;
+  quickSetupDone: boolean;
 }
 
 export interface AppData {

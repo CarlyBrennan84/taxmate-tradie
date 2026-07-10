@@ -53,6 +53,7 @@ const DEFAULT_DATA: AppData = {
     name: "", occupation: "Apprentice Electrician", fy: "2025–26",
     income: 0, taxWithheld: 0, phoneWorkPct: 0, laundryEstimate: 0,
     vehicle: { make: "", model: "", rego: "", openingOdometer: 0 },
+    quickSetupDone: false,
   },
   receipts: [],
   trips: [],
@@ -394,17 +395,30 @@ function SetupCard({ steps }: { steps: SetupStep[] }) {
   );
 }
 
-function QuickSetupCard({ occupation, income, onOccupation, onIncome, disabled }: { occupation: string; income: number; onOccupation: (v: string) => void; onIncome: (v: number) => void; disabled?: boolean }) {
+function QuickSetupCard({ occupation, income, onSave, disabled }: { occupation: string; income: number; onSave: (occupation: string, income: number) => void; disabled?: boolean }) {
+  const [draftOccupation, setDraftOccupation] = useState(occupation);
+  const [draftIncome, setDraftIncome] = useState(income ? String(income) : "");
+  const canSave = draftOccupation.trim() !== "" && (parseFloat(draftIncome) || 0) > 0;
   return (
     <Card className="p-5">
       <SectionTitle eyebrow="Quick setup" title="Tell TaxMate about your work" sub="Just enough to start estimating your refund — you can refine the details later." />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Job description">
-          <input disabled={disabled} value={occupation} onChange={(e) => onOccupation(e.target.value)} placeholder="e.g. Apprentice Electrician" className={inputCls} />
+          <input disabled={disabled} value={draftOccupation} onChange={(e) => setDraftOccupation(e.target.value)} placeholder="e.g. Apprentice Electrician" className={inputCls} />
         </Field>
         <Field label="Expected income this year ($)">
-          <input disabled={disabled} type="number" value={income || ""} onChange={(e) => onIncome(Number(e.target.value))} placeholder="e.g. 52000" className={inputCls} />
+          <input disabled={disabled} type="number" value={draftIncome} onChange={(e) => setDraftIncome(e.target.value)} placeholder="e.g. 52000" className={inputCls} />
         </Field>
+      </div>
+      <div className="flex justify-end mt-3">
+        <button
+          onClick={() => onSave(draftOccupation, parseFloat(draftIncome) || 0)}
+          disabled={disabled || !canSave}
+          className="px-4 py-2 rounded-xl text-sm font-semibold text-white shadow-sm hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{ backgroundColor: TEAL }}
+        >
+          Save
+        </button>
       </div>
     </Card>
   );
@@ -583,6 +597,11 @@ export default function App() {
     setShowReceiptForm(true);
     setReceiptCategoryFilter("all");
     setTab("receipts");
+  };
+
+  const saveQuickSetup = (occupation: string, income: number) => {
+    if (demoMode) return;
+    update((d) => { d.profile.occupation = occupation; d.profile.income = income; d.profile.quickSetupDone = true; return d; });
   };
 
   const quickUploadReceipt = () => {
@@ -793,13 +812,14 @@ export default function App() {
 
               <TopQuickPanel onUpload={quickUploadReceipt} onLogTravel={quickLogTravel} disabled={demoMode} />
 
-              <QuickSetupCard
-                occupation={activeData.profile.occupation}
-                income={activeData.profile.income}
-                onOccupation={(v) => setProfile("occupation", v)}
-                onIncome={(v) => setProfile("income", v)}
-                disabled={demoMode}
-              />
+              {!activeData.profile.quickSetupDone && (
+                <QuickSetupCard
+                  occupation={activeData.profile.occupation}
+                  income={activeData.profile.income}
+                  onSave={saveQuickSetup}
+                  disabled={demoMode}
+                />
+              )}
 
               <SetupCard steps={setupSteps} />
 
@@ -827,8 +847,9 @@ export default function App() {
                   {showEstimator && (
                     <div className="w-full grid grid-cols-2 gap-3 mt-4 pt-4 border-t" style={{ borderColor: GREY_LINE }}>
                       <Field label="Your name"><input disabled={demoMode} value={activeData.profile.name} onChange={(e) => setProfile("name", e.target.value)} placeholder="Optional" className={inputCls} /></Field>
+                      <Field label="Occupation"><input disabled={demoMode} value={activeData.profile.occupation} onChange={(e) => setProfile("occupation", e.target.value)} className={inputCls} /></Field>
+                      <Field label="Gross income ($/yr)"><input disabled={demoMode} type="number" value={activeData.profile.income} onChange={(e) => setProfile("income", Number(e.target.value))} className={inputCls} /></Field>
                       <Field label="Tax withheld ($)"><input disabled={demoMode} type="number" value={activeData.profile.taxWithheld} onChange={(e) => setProfile("taxWithheld", Number(e.target.value))} className={inputCls} /></Field>
-                      <p className="col-span-2 text-[11px]" style={{ color: "#8A93A3" }}>Job description and expected income are set in Quick setup, above.</p>
                     </div>
                   )}
                 </Card>
