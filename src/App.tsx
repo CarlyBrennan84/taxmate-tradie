@@ -4,7 +4,7 @@ import {
   GraduationCap, FileText, Plus, Trash2, ChevronRight, Menu,
   Download, Printer, TrendingUp, Gauge, MapPin, Sparkles, Camera,
   Check, CheckCircle2, AlertTriangle, Fuel, Upload, ShieldCheck, X,
-  Search, SlidersHorizontal,
+  Search, SlidersHorizontal, Send,
 } from "lucide-react";
 import type { AppData, Receipt as ReceiptT, Trip, CategoryKey } from "./types";
 import { loadData, saveData, loadDemoFlag, saveDemoFlag } from "./lib/storage";
@@ -64,6 +64,9 @@ const fmtDec = (n: number): string =>
 const todayISO = (): string => new Date().toISOString().slice(0, 10);
 
 const RECEIPT_SCANNER_URL = import.meta.env.VITE_RECEIPT_SCANNER_URL;
+const ASSISTANT_URL = RECEIPT_SCANNER_URL ? `${RECEIPT_SCANNER_URL.replace(/\/$/, "")}/assistant` : undefined;
+
+interface AssistantMessage { role: "user" | "assistant"; content: any[] }
 
 interface ScannedReceipt {
   vendor?: string;
@@ -327,23 +330,30 @@ function AnimatedBar({ pct, color = TEAL }: { pct: number; color?: string }) {
   );
 }
 
-function TaxReadyRing({ pct }: { pct: number }) {
-  const r = 54;
-  const circumference = 2 * Math.PI * r;
-  const [animated, setAnimated] = useState(0);
-  useEffect(() => { const t = window.setTimeout(() => setAnimated(pct), 120); return () => window.clearTimeout(t); }, [pct]);
-  const color = pct >= 0.8 ? TEAL : pct >= 0.4 ? AMBER : "#B7BEC9";
+function TrendSparkline({ points, color = "#fff" }: { points: number[]; color?: string }) {
+  if (points.length < 2) return null;
+  const max = Math.max(...points, 1);
+  const min = Math.min(...points, 0);
+  const range = max - min || 1;
+  const w = 280, h = 56;
+  const stepX = w / (points.length - 1);
+  const coords = points.map((p, i) => [i * stepX, h - ((p - min) / range) * h] as const);
+  const pathD = coords.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const areaD = `${pathD} L${w},${h} L0,${h} Z`;
+  const gradId = "sparkFade";
   return (
-    <svg width="140" height="140" viewBox="0 0 140 140">
-      <circle cx="70" cy="70" r={r} fill="none" stroke="#EEF0F4" strokeWidth={12} />
-      <circle
-        cx="70" cy="70" r={r} fill="none" stroke={color} strokeWidth={12} strokeLinecap="round"
-        strokeDasharray={circumference}
-        strokeDashoffset={circumference * (1 - animated)}
-        transform="rotate(-90 70 70)"
-        style={{ transition: "stroke-dashoffset 1s cubic-bezier(0.22, 1, 0.36, 1), stroke 0.5s" }}
-      />
-      <text x="70" y="78" textAnchor="middle" fontSize="28" fontWeight="700" fill={NAVY}>{Math.round(pct * 100)}%</text>
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-14" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={areaD} fill={`url(#${gradId})`} stroke="none" />
+      <path d={pathD} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {coords.map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r={i === coords.length - 1 ? 3.5 : 2} fill={color} opacity={i === coords.length - 1 ? 1 : 0.5} />
+      ))}
     </svg>
   );
 }
@@ -486,6 +496,105 @@ function FloatingActionButton({ onScan, onLogTrip, onAddExpense, onImportCsv, di
   );
 }
 
+function AssistantButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      aria-label="TaxMate AI"
+      className="fixed left-4 sm:left-6 bottom-20 lg:bottom-6 z-40 w-14 h-14 rounded-full flex items-center justify-center shadow-card-hover transition disabled:opacity-50"
+      style={{ backgroundColor: NAVY }}
+    >
+      <Sparkles size={22} color={TEAL} />
+    </button>
+  );
+}
+
+const ASSISTANT_QUICK_REPLY_RE = /business or personal|business\/personal/i;
+
+function AssistantModal({ messages, loading, onSend, onClose, disabled }: { messages: AssistantMessage[]; loading: boolean; onSend: (text: string) => void; onClose: () => void; disabled?: boolean }) {
+  const [input, setInput] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, loading]);
+
+  const send = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || loading || disabled) return;
+    onSend(trimmed);
+    setInput("");
+  };
+
+  const lastAssistantText = (() => {
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant") return "";
+    return last.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join(" ");
+  })();
+  const showQuickReplies = !loading && ASSISTANT_QUICK_REPLY_RE.test(lastAssistantText);
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-white">
+      <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: GREY_LINE }}>
+        <div className="flex items-center gap-2">
+          <Sparkles size={17} color={TEAL_DARK} />
+          <span className="text-sm font-bold" style={{ color: NAVY }}>TaxMate AI</span>
+        </div>
+        <button onClick={onClose} className="p-1.5 rounded-lg text-[#B7BEC9] hover:bg-[#F0F1F4] transition"><X size={18} /></button>
+      </div>
+
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+        {messages.length === 0 && (
+          <div className="rounded-2xl px-4 py-3 max-w-[85%]" style={{ backgroundColor: "#FBFBFC" }}>
+            <p className="text-sm leading-relaxed" style={{ color: NAVY }}>Hi! I'm your TaxMate AI. Ask me anything about your tax, deductions or claims — or tell me about a trip or expense and I'll log it for you.</p>
+          </div>
+        )}
+        {messages.map((m, i) => {
+          const text = m.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n");
+          if (!text) return null;
+          return (
+            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div className="rounded-2xl px-4 py-2.5 max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap" style={m.role === "user" ? { backgroundColor: TEAL, color: "#fff" } : { backgroundColor: "#FBFBFC", color: NAVY }}>
+                {text}
+              </div>
+            </div>
+          );
+        })}
+        {loading && (
+          <div className="flex justify-start">
+            <div className="rounded-2xl px-4 py-3" style={{ backgroundColor: "#FBFBFC" }}>
+              <div className="flex gap-1">
+                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: "#B7BEC9" }} />
+                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: "#B7BEC9", animationDelay: "150ms" }} />
+                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: "#B7BEC9", animationDelay: "300ms" }} />
+              </div>
+            </div>
+          </div>
+        )}
+        {showQuickReplies && (
+          <div className="flex gap-2 fade-up">
+            <button onClick={() => send("Business")} className="px-4 py-2 rounded-full text-sm font-semibold border transition hover:brightness-95" style={{ borderColor: GREY_LINE, color: NAVY }}>Business</button>
+            <button onClick={() => send("Personal")} className="px-4 py-2 rounded-full text-sm font-semibold border transition hover:brightness-95" style={{ borderColor: GREY_LINE, color: NAVY }}>Personal</button>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 px-4 py-3 border-t flex-shrink-0" style={{ borderColor: GREY_LINE }}>
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") send(input); }}
+          placeholder={disabled ? "Not available in demo mode" : "Ask me anything…"}
+          disabled={disabled || loading}
+          className={inputCls}
+        />
+        <button onClick={() => send(input)} disabled={disabled || loading || !input.trim()} className="p-3 rounded-xl text-white transition disabled:opacity-50 flex-shrink-0" style={{ backgroundColor: TEAL }}>
+          <Send size={17} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ReadinessItem({ ok, title, detail, cta, onGo }: { ok: boolean; title: string; detail: string; cta?: string; onGo?: () => void }) {
   return (
     <div className="flex items-start gap-3 py-3.5 border-b last:border-0" style={{ borderColor: GREY_LINE }}>
@@ -556,6 +665,9 @@ export default function App() {
   const [scanningIds, setScanningIds] = useState<Set<string>>(new Set());
   const [demoMode, setDemoMode] = useState<boolean>(() => loadDemoFlag());
   const [csvPreview, setCsvPreview] = useState<Trip[] | null>(null);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
+  const [assistantLoading, setAssistantLoading] = useState(false);
   const csvInputRef = useRef<HTMLInputElement>(null);
   const receiptInputRef = useRef<HTMLInputElement>(null);
 
@@ -708,6 +820,89 @@ export default function App() {
   const vehicleEvidenceComplete = logbookReady && businessKm > 0;
   const currentOdometer = (Number(activeData.profile.vehicle.openingOdometer) || 0) + totalKm;
 
+  const buildAssistantContext = () => ({
+    occupation: activeData.profile.occupation,
+    income,
+    totalDeductions,
+    estimatedRefund,
+    receiptsCount: receiptsWithNum.length,
+    tripsCount: trips.length,
+    logbookDays: Math.min(daysElapsed, 84),
+  });
+
+  const executeAssistantTool = (name: string, input: any): string => {
+    if (demoMode) return "Can't make changes in demo mode.";
+    switch (name) {
+      case "log_trip": {
+        const t: Trip = { id: uid(), date: todayISO(), purpose: input.purpose || "", type: input.type === "personal" ? "personal" : "business", km: Number(input.km) || 0 };
+        addTrip(t);
+        return `Logged a ${t.km}km ${t.type} trip.`;
+      }
+      case "add_expense": {
+        const category: CategoryKey = CATEGORIES.some((c) => c.key === input.category) ? input.category : "other";
+        const r: ReceiptT = { id: uid(), date: todayISO(), vendor: input.vendor || "Untitled", category, amount: Number(input.amount) || 0, workPct: 100, filed: false, notes: "Added via TaxMate AI" };
+        addReceipt(r);
+        return `Added ${r.vendor} — ${fmtDec(r.amount)} to ${category}.`;
+      }
+      case "search_receipts": {
+        const q = String(input.query || "").toLowerCase();
+        const matches = receiptsWithNum.filter((r) => r.vendor.toLowerCase().includes(q) || (r.notes || "").toLowerCase().includes(q)).slice(0, 5);
+        return JSON.stringify(matches.map((r) => ({ id: r.id, vendor: r.vendor, amount: r.amount, date: r.date, category: r.category, workPct: r.workPct })));
+      }
+      case "update_receipt": {
+        const existing = receiptsWithNum.find((r) => r.id === input.id);
+        if (!existing) return "Receipt not found — try search_receipts again.";
+        const updated: ReceiptT = {
+          ...existing,
+          workPct: input.workPct !== undefined ? Number(input.workPct) : existing.workPct,
+          amount: input.amount !== undefined ? Number(input.amount) : existing.amount,
+          notes: input.notes !== undefined ? String(input.notes) : existing.notes,
+        };
+        saveReceiptEdit(updated);
+        return "Updated.";
+      }
+      default:
+        return "Unknown action.";
+    }
+  };
+
+  const runAssistantConversation = async (history: AssistantMessage[]) => {
+    if (!ASSISTANT_URL) return;
+    setAssistantLoading(true);
+    let current = history;
+    try {
+      for (let i = 0; i < 6; i++) {
+        const res = await fetch(ASSISTANT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: current, context: buildAssistantContext() }),
+        });
+        if (!res.ok) throw new Error("assistant failed");
+        const data = await res.json();
+        const content = data.content || [];
+        current = [...current, { role: "assistant", content }];
+        setAssistantMessages(current);
+
+        const toolUses = content.filter((b: any) => b.type === "tool_use");
+        if (toolUses.length === 0) break;
+
+        const toolResults = toolUses.map((tu: any) => ({ type: "tool_result", tool_use_id: tu.id, content: executeAssistantTool(tu.name, tu.input) }));
+        current = [...current, { role: "user", content: toolResults }];
+        setAssistantMessages(current);
+      }
+    } catch {
+      setAssistantMessages((prev) => [...prev, { role: "assistant", content: [{ type: "text", text: "Sorry, I couldn't reach the assistant just then — try again in a moment." }] }]);
+    } finally {
+      setAssistantLoading(false);
+    }
+  };
+
+  const sendAssistantMessage = (text: string) => {
+    const updated: AssistantMessage[] = [...assistantMessages, { role: "user", content: [{ type: "text", text }] }];
+    setAssistantMessages(updated);
+    runAssistantConversation(updated);
+  };
+
   const categoryTotals = CATEGORIES.map((c) => ({
     ...c,
     total: receiptsWithNum.filter((r) => r.category === c.key).reduce((s, r) => s + r.amount, 0),
@@ -732,6 +927,36 @@ export default function App() {
     { key: "accountant", ok: accountantReady, title: "Accountant summary ready", detail: accountantReady ? "Everything's in good shape for tax time" : "A few things above still need attention before your pack is complete", cta: "View pack", onGo: () => setTab("summary") },
   ];
   const readinessScore = readinessChecks.filter((c) => c.ok).length;
+
+  const weeklyDeductionsTrend = (() => {
+    const weeks = 8;
+    const buckets = Array(weeks).fill(0);
+    const now = Date.now();
+    receiptsWithNum.forEach((r) => {
+      if (!r.date) return;
+      const weeksAgo = Math.floor((now - new Date(r.date).getTime()) / (7 * 86400000));
+      if (weeksAgo >= 0 && weeksAgo < weeks) buckets[weeks - 1 - weeksAgo] += r.amount * (r.workPct / 100);
+    });
+    let running = 0;
+    return buckets.map((b) => (running += b));
+  })();
+  const weeklyDelta = weeklyDeductionsTrend.length > 1 ? weeklyDeductionsTrend[weeklyDeductionsTrend.length - 1] - weeklyDeductionsTrend[weeklyDeductionsTrend.length - 2] : 0;
+
+  const taxReadySummary = [
+    { icon: Camera, label: `${receiptsWithNum.length} receipt${receiptsWithNum.length === 1 ? "" : "s"} logged`, done: receiptsWithNum.length > 0 },
+    { icon: Car, label: `${trips.length} trip${trips.length === 1 ? "" : "s"} logged`, done: trips.length > 0 },
+    { icon: Wrench, label: `${fmt(totalDeductions)} deductions`, done: totalDeductions > 0 },
+    { icon: ShieldCheck, label: "Tax details complete", done: income > 0 && withheld > 0 },
+  ];
+
+  const todaySuggestion = (() => {
+    if (unfiledCount > 0) return { text: `You have ${unfiledCount} receipt${unfiledCount === 1 ? "" : "s"} to file.`, action: () => setTab("progress") };
+    if (missingDetailsCount > 0) return { text: `${missingDetailsCount} receipt${missingDetailsCount === 1 ? " needs" : "s need"} a vendor or amount.`, action: () => setTab("progress") };
+    if (trips.length === 0) return { text: "Log today's work trip to start your 12-week logbook.", action: quickLogTravel };
+    if (!logbookReady) return { text: `You're ${Math.min(daysElapsed, 84)} days into your logbook — keep it going.`, action: () => setTab("vehicle") };
+    if (!laundryEstimate) return { text: "Add a laundry estimate — up to $150 without receipts.", action: () => setTab("expenses") };
+    return null;
+  })();
 
   const exportCSV = () => {
     const rows: (string | number)[][] = [["Date", "Vendor", "Category", "Amount", "Work %", "Deductible", "Filed", "Notes"]];
@@ -853,11 +1078,18 @@ export default function App() {
                   disabled={demoMode}
                 />
               ) : (
-                <Card className="p-6 text-center" delay={0}>
-                  <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#8A93A3" }}>Estimated Refund</div>
-                  <div className="text-4xl font-bold tabular mt-1" style={{ color: NAVY }}><AnimatedNumber value={Math.max(0, estimatedRefund)} /></div>
-                  <div className="text-xs mt-2" style={{ color: "#8A93A3" }}>{fmt(income)} income · {fmt(totalDeductions)} deductions logged</div>
-                </Card>
+                <div className="rounded-3xl p-6 fade-up" style={{ background: `linear-gradient(135deg, ${NAVY} 0%, ${TEAL_DARK} 100%)` }}>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-white/70">Estimated Refund</div>
+                  <div className="text-4xl font-bold tabular mt-1 text-white"><AnimatedNumber value={Math.max(0, estimatedRefund)} /></div>
+                  {weeklyDelta > 0 && (
+                    <div className="inline-flex items-center gap-1 mt-3 px-3 py-1 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: "rgba(255,255,255,0.18)" }}>
+                      <TrendingUp size={12} /> {fmt(weeklyDelta)} this week
+                    </div>
+                  )}
+                  <div className="mt-3 -mx-1">
+                    <TrendSparkline points={weeklyDeductionsTrend} color="#5EEAD4" />
+                  </div>
+                </div>
               )}
 
               <div className="grid grid-cols-2 gap-3">
@@ -876,6 +1108,19 @@ export default function App() {
               </button>
 
               <TodayCard steps={setupSteps} />
+
+              {todaySuggestion && (
+                <Card className="p-4 flex items-center gap-3">
+                  <Sparkles size={16} color={TEAL_DARK} className="flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#8A93A3" }}>Today's suggestion</div>
+                    <div className="text-sm font-medium mt-0.5" style={{ color: NAVY }}>{todaySuggestion.text}</div>
+                  </div>
+                  <button onClick={todaySuggestion.action} disabled={demoMode} className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-white disabled:opacity-50 transition hover:brightness-110" style={{ backgroundColor: TEAL }}>
+                    <Plus size={16} />
+                  </button>
+                </Card>
+              )}
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Card className="p-4 text-center" delay={60}>
@@ -902,16 +1147,38 @@ export default function App() {
             <div className="space-y-4">
               <SectionTitle title="Progress" />
 
-              <Card className="p-6 flex flex-col items-center text-center">
-                <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#8A93A3" }}>Tax Ready</div>
-                <TaxReadyRing pct={readinessChecks.length ? readinessScore / readinessChecks.length : 0} />
-                <div className="text-sm mt-3" style={{ color: NAVY_SOFT }}>
-                  <span className="font-semibold" style={{ color: NAVY }}>{receiptsWithNum.length}</span> receipts · <span className="font-semibold" style={{ color: NAVY }}>{trips.length}</span> trips · <span className="font-semibold" style={{ color: NAVY }}>{fmt(totalDeductions)}</span> deductions
-                </div>
-                <div className="mt-4 pt-4 border-t w-full" style={{ borderColor: GREY_LINE }}>
-                  <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "#8A93A3" }}>Estimated Refund</div>
-                  <div className="text-2xl font-bold tabular mt-0.5" style={{ color: NAVY }}><AnimatedNumber value={Math.max(0, estimatedRefund)} /></div>
-                </div>
+              {(() => {
+                const readyPct = readinessChecks.length ? readinessScore / readinessChecks.length : 0;
+                const readyMessage = readyPct >= 0.8 ? "You're almost there! 🎉" : readyPct >= 0.4 ? "You're making great progress! 🎉" : "Let's get your claim sorted.";
+                return (
+                  <div className="rounded-3xl p-6 fade-up text-white" style={{ background: `linear-gradient(135deg, ${NAVY} 0%, ${TEAL_DARK} 100%)` }}>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-white/70">Tax Ready</div>
+                    <div className="text-5xl font-bold mt-1 tabular">{Math.round(readyPct * 100)}%</div>
+                    <div className="mt-3">
+                      <AnimatedBar pct={readyPct} color="#fff" />
+                    </div>
+                    <div className="text-sm mt-3 text-white/90">{readyMessage}</div>
+                    <div className="mt-4 pt-4 space-y-2.5" style={{ borderTop: "1px solid rgba(255,255,255,0.2)" }}>
+                      {taxReadySummary.map((s) => (
+                        <div key={s.label} className="flex items-center gap-2.5 text-sm">
+                          <s.icon size={15} className="text-white/70 flex-shrink-0" />
+                          <span className="flex-1">{s.label}</span>
+                          {s.done ? <CheckCircle2 size={16} className="text-white flex-shrink-0" /> : <div className="w-4 h-4 rounded-full border-2 border-white/40 flex-shrink-0" />}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <Card className="p-6 text-center">
+                <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#8A93A3" }}>Estimated Refund</div>
+                <div className="text-2xl font-bold tabular mt-0.5" style={{ color: NAVY }}><AnimatedNumber value={Math.max(0, estimatedRefund)} /></div>
+                {weeklyDelta > 0 && (
+                  <div className="inline-flex items-center gap-1 mt-2 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: TEAL_TINT, color: TEAL_DARK }}>
+                    <TrendingUp size={12} /> {fmt(weeklyDelta)} this week
+                  </div>
+                )}
               </Card>
 
               {readinessChecks.filter((c) => !c.ok).length > 0 && (
@@ -1244,12 +1511,25 @@ export default function App() {
         </div>
       )}
 
-      {!showReceiptForm && !showTripForm && !editingReceipt && (
-        <FloatingActionButton
-          onScan={quickUploadReceipt}
-          onLogTrip={quickLogTravel}
-          onAddExpense={openManualExpenseEntry}
-          onImportCsv={() => { if (demoMode) return; csvInputRef.current?.click(); }}
+      {!showReceiptForm && !showTripForm && !editingReceipt && !assistantOpen && (
+        <>
+          <FloatingActionButton
+            onScan={quickUploadReceipt}
+            onLogTrip={quickLogTravel}
+            onAddExpense={openManualExpenseEntry}
+            onImportCsv={() => { if (demoMode) return; csvInputRef.current?.click(); }}
+            disabled={demoMode}
+          />
+          {ASSISTANT_URL && <AssistantButton onClick={() => setAssistantOpen(true)} disabled={demoMode} />}
+        </>
+      )}
+
+      {assistantOpen && (
+        <AssistantModal
+          messages={assistantMessages}
+          loading={assistantLoading}
+          onSend={sendAssistantMessage}
+          onClose={() => setAssistantOpen(false)}
           disabled={demoMode}
         />
       )}
