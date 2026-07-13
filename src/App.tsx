@@ -327,6 +327,27 @@ function AnimatedBar({ pct, color = TEAL }: { pct: number; color?: string }) {
   );
 }
 
+function TaxReadyRing({ pct }: { pct: number }) {
+  const r = 54;
+  const circumference = 2 * Math.PI * r;
+  const [animated, setAnimated] = useState(0);
+  useEffect(() => { const t = window.setTimeout(() => setAnimated(pct), 120); return () => window.clearTimeout(t); }, [pct]);
+  const color = pct >= 0.8 ? TEAL : pct >= 0.4 ? AMBER : "#B7BEC9";
+  return (
+    <svg width="140" height="140" viewBox="0 0 140 140">
+      <circle cx="70" cy="70" r={r} fill="none" stroke="#EEF0F4" strokeWidth={12} />
+      <circle
+        cx="70" cy="70" r={r} fill="none" stroke={color} strokeWidth={12} strokeLinecap="round"
+        strokeDasharray={circumference}
+        strokeDashoffset={circumference * (1 - animated)}
+        transform="rotate(-90 70 70)"
+        style={{ transition: "stroke-dashoffset 1s cubic-bezier(0.22, 1, 0.36, 1), stroke 0.5s" }}
+      />
+      <text x="70" y="78" textAnchor="middle" fontSize="28" fontWeight="700" fill={NAVY}>{Math.round(pct * 100)}%</text>
+    </svg>
+  );
+}
+
 function Disclosure({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -516,7 +537,7 @@ function MethodCompareCard({ centsPerKmEstimate, logbookEstimate, logbookReady, 
 /* =================================================================
    MAIN APP
 ==================================================================*/
-type TabKey = "overview" | "receipts" | "vehicle" | "expenses" | "checklist" | "summary";
+type TabKey = "overview" | "vehicle" | "expenses" | "progress" | "summary";
 
 export default function App() {
   const [data, setData] = useState<AppData | null>(null);
@@ -618,7 +639,7 @@ export default function App() {
     setReceiptFormCategoryLock(undefined);
     setShowReceiptForm(true);
     setReceiptCategoryFilter("all");
-    setTab("receipts");
+    setTab("progress");
   };
 
   const saveQuickSetup = (occupation: string, income: number) => {
@@ -629,7 +650,7 @@ export default function App() {
   const quickUploadReceipt = () => {
     if (demoMode) return;
     setReceiptCategoryFilter("all");
-    setTab("receipts");
+    setTab("progress");
     receiptInputRef.current?.click();
   };
 
@@ -703,8 +724,8 @@ export default function App() {
   const accountantReady = receiptsWithNum.length > 0 && receiptsFiledPct === 100 && missingDetailsCount === 0 && vehicleEvidenceComplete && laundryAdded && phonePctAdded && income > 0;
 
   const readinessChecks = [
-    { key: "filed", ok: receiptsWithNum.length > 0 && receiptsFiledPct === 100, title: "Receipts saved", detail: receiptsWithNum.length ? `${receiptsFiledPct}% of ${receiptsWithNum.length} receipts marked as filed` : "No receipts logged yet", cta: "Review receipts", onGo: () => setTab("receipts") },
-    { key: "missing", ok: missingDetailsCount === 0, title: "Missing receipt details", detail: missingDetailsCount ? `${missingDetailsCount} receipt(s) still need a vendor or amount` : "All receipts have complete details", cta: "Fix details", onGo: () => setTab("receipts") },
+    { key: "filed", ok: receiptsWithNum.length > 0 && receiptsFiledPct === 100, title: "Receipts saved", detail: receiptsWithNum.length ? `${receiptsFiledPct}% of ${receiptsWithNum.length} receipts marked as filed` : "No receipts logged yet", cta: "Review receipts", onGo: () => setTab("progress") },
+    { key: "missing", ok: missingDetailsCount === 0, title: "Missing receipt details", detail: missingDetailsCount ? `${missingDetailsCount} receipt(s) still need a vendor or amount` : "All receipts have complete details", cta: "Fix details", onGo: () => setTab("progress") },
     { key: "vehicle", ok: vehicleEvidenceComplete, title: "Vehicle evidence complete", detail: vehicleEvidenceComplete ? "12-week logbook complete with business km logged" : `${Math.min(daysElapsed, 84)}/84 days of your logbook done`, cta: "Go to logbook", onGo: () => setTab("vehicle") },
     { key: "laundry", ok: laundryAdded, title: "Laundry estimate added", detail: laundryAdded ? `${fmt(laundryEstimate)} claimed for uniform laundering` : "Add an estimate for washing your work uniform", cta: "Add estimate", onGo: () => setTab("expenses") },
     { key: "phone", ok: phonePctAdded, title: "Phone work-use % added", detail: phonePctAdded ? `${activeData.profile.phoneWorkPct}% of your phone bill claimed as work use` : "Set what % of your phone use is for work", cta: "Add %", onGo: () => setTab("expenses") },
@@ -728,18 +749,16 @@ export default function App() {
   const setupSteps: SetupStep[] = [
     { key: "vehicle", label: "Vehicle added", done: !!(activeData.profile.vehicle.make && activeData.profile.vehicle.rego), onGo: () => setTab("vehicle") },
     { key: "odometer", label: "Opening odometer entered", done: (Number(activeData.profile.vehicle.openingOdometer) || 0) > 0, onGo: () => setTab("vehicle") },
-    { key: "receipt", label: missingDetailsCount > 0 ? `${missingDetailsCount} receipt${missingDetailsCount === 1 ? "" : "s"} need${missingDetailsCount === 1 ? "s" : ""} details` : "Upload your first receipt", done: receiptsWithNum.length > 0 && missingDetailsCount === 0, onGo: () => setTab("receipts") },
+    { key: "receipt", label: missingDetailsCount > 0 ? `${missingDetailsCount} receipt${missingDetailsCount === 1 ? "" : "s"} need${missingDetailsCount === 1 ? "s" : ""} details` : "Upload your first receipt", done: receiptsWithNum.length > 0 && missingDetailsCount === 0, onGo: () => setTab("progress") },
     { key: "logbook", label: trips.length > 0 ? `Continue logbook — ${Math.min(daysElapsed, 84)}/84 days` : "Start your logbook", done: logbookReady, onGo: () => setTab("vehicle") },
     { key: "income", label: "Add tax withheld", done: withheld > 0, onGo: () => setTab("expenses") },
   ];
 
   const NAV: { key: TabKey; label: string; icon: React.ElementType }[] = [
-    { key: "overview", label: "Overview", icon: LayoutDashboard },
-    { key: "receipts", label: "Receipts", icon: Receipt },
-    { key: "vehicle", label: "Vehicle Logbook", icon: Car },
+    { key: "overview", label: "Home", icon: LayoutDashboard },
+    { key: "vehicle", label: "Logbook", icon: Car },
     { key: "expenses", label: "Deductions", icon: Wrench },
-    { key: "checklist", label: "Tax Checklist", icon: ShieldCheck },
-    { key: "summary", label: "Accountant Pack", icon: FileText },
+    { key: "progress", label: "Progress", icon: ShieldCheck },
   ];
 
   const filteredReceipts = receiptCategoryFilter === "all" ? receiptsWithNum : receiptsWithNum.filter((r) => r.category === receiptCategoryFilter);
@@ -851,7 +870,7 @@ export default function App() {
                   Log Trip
                 </button>
               </div>
-              <button onClick={() => setTab("checklist")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold border bg-white transition hover:brightness-95" style={{ borderColor: GREY_LINE, color: NAVY }}>
+              <button onClick={() => setTab("progress")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold border bg-white transition hover:brightness-95" style={{ borderColor: GREY_LINE, color: NAVY }}>
                 <ShieldCheck size={16} color={TEAL_DARK} />
                 View Progress
               </button>
@@ -879,8 +898,34 @@ export default function App() {
             </div>
           )}
 
-          {tab === "receipts" && (
+          {tab === "progress" && (
             <div className="space-y-4">
+              <SectionTitle title="Progress" />
+
+              <Card className="p-6 flex flex-col items-center text-center">
+                <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#8A93A3" }}>Tax Ready</div>
+                <TaxReadyRing pct={readinessChecks.length ? readinessScore / readinessChecks.length : 0} />
+                <div className="text-sm mt-3" style={{ color: NAVY_SOFT }}>
+                  <span className="font-semibold" style={{ color: NAVY }}>{receiptsWithNum.length}</span> receipts · <span className="font-semibold" style={{ color: NAVY }}>{trips.length}</span> trips · <span className="font-semibold" style={{ color: NAVY }}>{fmt(totalDeductions)}</span> deductions
+                </div>
+                <div className="mt-4 pt-4 border-t w-full" style={{ borderColor: GREY_LINE }}>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "#8A93A3" }}>Estimated Refund</div>
+                  <div className="text-2xl font-bold tabular mt-0.5" style={{ color: NAVY }}><AnimatedNumber value={Math.max(0, estimatedRefund)} /></div>
+                </div>
+              </Card>
+
+              {readinessChecks.filter((c) => !c.ok).length > 0 && (
+                <Card className="p-2">
+                  <div className="px-3 pt-2 pb-1 text-xs font-semibold" style={{ color: NAVY_SOFT }}>What's left</div>
+                  {readinessChecks.filter((c) => !c.ok).map((c) => <ReadinessItem key={c.key} ok={c.ok} title={c.title} detail={c.detail} cta={c.cta} onGo={c.onGo} />)}
+                </Card>
+              )}
+
+              <button onClick={() => setTab("summary")} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold border bg-white transition hover:brightness-95" style={{ borderColor: GREY_LINE, color: NAVY }}>
+                <FileText size={15} color={TEAL_DARK} />
+                View Accountant Pack
+              </button>
+
               <SectionTitle title="Receipts" />
 
               <div className="flex items-center gap-2">
@@ -1110,17 +1155,11 @@ export default function App() {
             </div>
           )}
 
-          {tab === "checklist" && (
-            <div className="space-y-6">
-              <SectionTitle title="ATO Readiness" eyebrow={`${readinessScore} of ${readinessChecks.length} ready`} sub="Updates automatically as you log receipts, trips and details — no manual ticking needed." />
-              <Card className="p-2">
-                {readinessChecks.map((c) => <ReadinessItem key={c.key} ok={c.ok} title={c.title} detail={c.detail} cta={c.cta} onGo={c.onGo} />)}
-              </Card>
-            </div>
-          )}
-
           {tab === "summary" && (
             <div className="space-y-6">
+              <button onClick={() => setTab("progress")} className="flex items-center gap-1 text-xs font-semibold print:hidden" style={{ color: TEAL_DARK }}>
+                <ChevronRight size={13} style={{ transform: "rotate(180deg)" }} /> Back to Progress
+              </button>
               <SectionTitle title="Accountant Pack" eyebrow="Print or export, ready to send"
                 action={<div className="flex gap-2 print:hidden">
                   <button onClick={exportCSV} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold border transition hover:bg-[#F6F7F9]" style={{ borderColor: GREY_LINE, color: NAVY }}><Download size={15} />Export CSV</button>
@@ -1129,7 +1168,7 @@ export default function App() {
 
               <Card className="p-4 flex items-center gap-3" style={{ backgroundColor: accountantReady ? TEAL_TINT : AMBER_TINT }}>
                 {accountantReady ? <CheckCircle2 size={18} color={TEAL_DARK} /> : <AlertTriangle size={16} color={AMBER} />}
-                <div className="text-sm font-medium" style={{ color: accountantReady ? TEAL_DARK : "#8A5A0F" }}>{accountantReady ? "This pack is ready to send to your accountant." : "A few things in Tax Checklist still need attention before this pack is fully ready."}</div>
+                <div className="text-sm font-medium" style={{ color: accountantReady ? TEAL_DARK : "#8A5A0F" }}>{accountantReady ? "This pack is ready to send to your accountant." : "A few things on Progress still need attention before this pack is fully ready."}</div>
               </Card>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
