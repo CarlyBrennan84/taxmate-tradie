@@ -513,6 +513,7 @@ export default function App() {
   const [demoMode, setDemoMode] = useState<boolean>(() => loadDemoFlag());
   const [csvPreview, setCsvPreview] = useState<Trip[] | null>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
+  const receiptInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { loadData(DEFAULT_DATA).then(setData); }, []);
   useEffect(() => { if (data && !demoMode) saveData(data); }, [data, demoMode]);
@@ -573,10 +574,9 @@ export default function App() {
 
   const quickUploadReceipt = () => {
     if (demoMode) return;
-    setReceiptFormCategoryLock(undefined);
-    setShowReceiptForm(true);
     setReceiptCategoryFilter("all");
     setTab("receipts");
+    receiptInputRef.current?.click();
   };
 
   const quickLogTravel = () => {
@@ -711,6 +711,7 @@ export default function App() {
   return (
     <div className="min-h-screen w-full font-sans" style={{ backgroundColor: GREY_BG }}>
       <input ref={csvInputRef} type="file" accept=".csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleCSVFile(f); e.target.value = ""; }} />
+      <input ref={receiptInputRef} type="file" multiple accept="image/*,.pdf" className="hidden" onChange={(e) => { if (e.target.files?.length) handleFiles(Array.from(e.target.files)); e.target.value = ""; }} />
 
       <div className="flex">
         <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 h-screen sticky top-0 border-r px-4 py-6 print:hidden" style={{ borderColor: GREY_LINE, backgroundColor: "#FFFFFF" }}>
