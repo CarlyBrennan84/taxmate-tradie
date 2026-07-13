@@ -66,6 +66,39 @@ const fmtDec = (n: number): string =>
   new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 2 }).format(isFinite(n) ? n : 0);
 const todayISO = (): string => new Date().toISOString().slice(0, 10);
 
+const RECEIPT_SCANNER_URL = import.meta.env.VITE_RECEIPT_SCANNER_URL;
+
+interface ScannedReceipt {
+  vendor?: string;
+  date?: string;
+  amount?: number;
+  category?: CategoryKey;
+  confidence?: "high" | "medium" | "low";
+}
+
+function resizeImageForScan(file: File, maxEdge = 1568, quality = 0.85): Promise<{ base64: string; mediaType: string }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      URL.revokeObjectURL(url);
+      if (!ctx) { reject(new Error("Canvas not supported")); return; }
+      ctx.drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL("image/jpeg", quality);
+      resolve({ base64: dataUrl.split(",")[1] || "", mediaType: "image/jpeg" });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Could not load image")); };
+    img.src = url;
+  });
+}
+
 /* ---------------------------------------------------------------
    Simplified AU resident tax calc (2024–25 style brackets) —
    for estimation only, not advice.
@@ -261,14 +294,14 @@ function ReceiptForm({ onSave, onCancel, categoryLock }: { onSave: (r: ReceiptT)
   );
 }
 
-function ReceiptRow({ r, onDelete, thumb }: { r: ReceiptT; onDelete: (id: string) => void; thumb?: string }) {
+function ReceiptRow({ r, onDelete, thumb, scanning }: { r: ReceiptT; onDelete: (id: string) => void; thumb?: string; scanning?: boolean }) {
   const ded = r.amount * (r.workPct / 100);
   const cat = CATEGORIES.find((c) => c.key === r.category);
   const incomplete = !r.vendor || !r.amount;
   return (
     <div className="flex items-center gap-3 py-3 px-1 border-b last:border-0" style={{ borderColor: GREY_LINE }}>
       <div className="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL_TINT }}>
-        {thumb ? <img src={thumb} alt="" className="w-full h-full object-cover" /> : cat && <cat.icon size={16} color={TEAL_DARK} />}
+        {thumb ? <img src={thumb} alt="" className={`w-full h-full object-cover ${scanning ? "animate-pulse" : ""}`} /> : cat && <cat.icon size={16} color={TEAL_DARK} />}
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium truncate" style={{ color: NAVY }}>{r.vendor || "Untitled receipt"}</div>
@@ -278,7 +311,12 @@ function ReceiptRow({ r, onDelete, thumb }: { r: ReceiptT; onDelete: (id: string
         <div className="text-sm font-semibold" style={{ color: NAVY }}>{fmtDec(r.amount)}</div>
         <div className="text-[11px] text-[#8A93A3]">{r.workPct}% · ded. {fmtDec(ded)}</div>
       </div>
-      {incomplete ? <Pill tone="amber">Needs details</Pill> : r.filed ? <Pill tone="teal">Filed</Pill> : <Pill tone="amber">To file</Pill>}
+      {scanning ? (
+        <div className="flex items-center gap-1.5 text-xs font-medium flex-shrink-0" style={{ color: TEAL_DARK }}>
+          <div className="w-3.5 h-3.5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: TEAL, borderTopColor: "transparent" }} />
+          Reading receipt…
+        </div>
+      ) : incomplete ? <Pill tone="amber">Needs details</Pill> : r.filed ? <Pill tone="teal">Filed</Pill> : <Pill tone="amber">To file</Pill>}
       <button onClick={() => onDelete(r.id)} className="p-1.5 rounded-lg text-[#B7BEC9] hover:text-[#C4573F] hover:bg-[#FBEAE6] transition flex-shrink-0"><Trash2 size={15} /></button>
     </div>
   );
@@ -510,6 +548,7 @@ export default function App() {
   const [receiptCategoryFilter, setReceiptCategoryFilter] = useState<CategoryKey | "all">("all");
   const [showTripForm, setShowTripForm] = useState(false);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
+  const [scanningIds, setScanningIds] = useState<Set<string>>(new Set());
   const [demoMode, setDemoMode] = useState<boolean>(() => loadDemoFlag());
   const [csvPreview, setCsvPreview] = useState<Trip[] | null>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
@@ -543,6 +582,35 @@ export default function App() {
   const setProfile = <K extends keyof AppData["profile"]>(k: K, v: AppData["profile"][K]) => update((d) => { d.profile[k] = v; return d; });
   const setVehicle = <K extends keyof AppData["profile"]["vehicle"]>(k: K, v: AppData["profile"]["vehicle"][K]) => update((d) => { d.profile.vehicle[k] = v; return d; });
 
+  const scanReceipt = async (id: string, file: File) => {
+    if (!RECEIPT_SCANNER_URL) return;
+    setScanningIds((p) => new Set(p).add(id));
+    try {
+      const { base64, mediaType } = await resizeImageForScan(file);
+      const res = await fetch(RECEIPT_SCANNER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: base64, mediaType }),
+      });
+      if (!res.ok) throw new Error("scan failed");
+      const result: ScannedReceipt = await res.json();
+      update((d) => {
+        const r = d.receipts.find((r) => r.id === id);
+        if (!r) return d;
+        if (result.vendor) r.vendor = result.vendor;
+        if (result.date) r.date = result.date;
+        if (typeof result.amount === "number" && result.amount > 0) r.amount = result.amount;
+        if (result.category) r.category = result.category;
+        r.notes = result.confidence === "low" ? "Auto-filled by AI — please double-check these details" : "Auto-filled by AI — check before filing";
+        return d;
+      });
+    } catch {
+      // Scan failed — leave the manual placeholder in place for the user to fill in.
+    } finally {
+      setScanningIds((p) => { const n = new Set(p); n.delete(id); return n; });
+    }
+  };
+
   const handleFiles = (files: File[]) => {
     if (demoMode) return;
     files.forEach((f) => {
@@ -551,6 +619,7 @@ export default function App() {
         const reader = new FileReader();
         reader.onload = (e) => setThumbs((p) => ({ ...p, [id]: e.target?.result as string }));
         reader.readAsDataURL(f);
+        scanReceipt(id, f);
       }
       update((d) => {
         d.receipts.unshift({ id, date: todayISO(), vendor: f.name.replace(/\.[^/.]+$/, ""), category: "other", amount: 0, workPct: 100, filed: false, notes: "Uploaded — add amount & category", fileName: f.name });
@@ -870,7 +939,7 @@ export default function App() {
                   {filteredReceipts.length === 0 ? (
                     <EmptyState icon={Receipt} title="No receipts here yet" subtitle="Drag a photo into the box above, or use a quick action on Overview — TaxMate will sort it into the right category." />
                   ) : (
-                    filteredReceipts.map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} thumb={thumbs[r.id]} />)
+                    filteredReceipts.map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} thumb={thumbs[r.id]} scanning={scanningIds.has(r.id)} />)
                   )}
                 </div>
               </Card>
@@ -974,7 +1043,7 @@ export default function App() {
                   {receiptsWithNum.filter((r) => r.category === "vehicle").length === 0 ? (
                     <EmptyState icon={Fuel} title="No vehicle expenses yet" subtitle={'Use the "Add fuel receipt" quick action on Overview, or log fuel, servicing or insurance here as "Vehicle & Fuel".'} />
                   ) : (
-                    receiptsWithNum.filter((r) => r.category === "vehicle").map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} thumb={thumbs[r.id]} />)
+                    receiptsWithNum.filter((r) => r.category === "vehicle").map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} thumb={thumbs[r.id]} scanning={scanningIds.has(r.id)} />)
                   )}
                 </div>
               </Card>
@@ -1029,7 +1098,7 @@ export default function App() {
                   {filteredReceipts.filter((r) => receiptCategoryFilter !== "all" || r.category !== "vehicle").length === 0 ? (
                     <EmptyState icon={Wrench} title="Nothing here yet" subtitle="Add a receipt from Overview's quick actions, or use the Add receipt button on the Receipts tab." />
                   ) : (
-                    filteredReceipts.filter((r) => receiptCategoryFilter !== "all" || r.category !== "vehicle").map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} thumb={thumbs[r.id]} />)
+                    filteredReceipts.filter((r) => receiptCategoryFilter !== "all" || r.category !== "vehicle").map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} thumb={thumbs[r.id]} scanning={scanningIds.has(r.id)} />)
                   )}
                 </div>
               </Card>
