@@ -1,17 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
-import * as ChartLib from "chart.js";
 import {
   LayoutDashboard, Receipt, Car, Wrench, Shirt, HardHat, Smartphone,
   GraduationCap, FileText, UploadCloud, Plus, Trash2, ChevronRight, Menu,
-  Download, Printer, TrendingUp, Gauge, MapPin, Sparkles,
-  Check, CheckCircle2, AlertTriangle, ArrowRight, Fuel, Upload, ShieldCheck, X,
+  Download, Printer, TrendingUp, Gauge, MapPin, Sparkles, Camera,
+  Check, CheckCircle2, AlertTriangle, Fuel, Upload, ShieldCheck, X,
 } from "lucide-react";
 import type { AppData, Receipt as ReceiptT, Trip, CategoryKey } from "./types";
 import { loadData, saveData, loadDemoFlag, saveDemoFlag } from "./lib/storage";
 import { SAMPLE_DATA } from "./sampleData";
 import { parseDriversnoteCSV } from "./csv";
-
-ChartLib.Chart.register(...ChartLib.registerables);
 
 /* ---------------------------------------------------------------
    Design tokens
@@ -42,7 +39,6 @@ const CATEGORIES: CategoryDef[] = [
   { key: "other", label: "Other Work Expenses", icon: Receipt },
 ];
 
-const FY_MONTHS = ["Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar","Apr","May","Jun"];
 
 const CENTS_PER_KM_RATE = 0.88; // ATO guide rate — confirm the current year's rate with your tax agent
 const CENTS_PER_KM_CAP_KM = 5000;
@@ -208,20 +204,6 @@ function EmptyState({ icon: Icon, title, subtitle, action }: { icon: React.Eleme
   );
 }
 
-function ChartCanvas({ type, data, options, heightClass = "h-56" }: { type: "bar" | "doughnut"; data: any; options: any; heightClass?: string }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const chartRef = useRef<ChartLib.Chart | null>(null);
-  const sig = JSON.stringify({ data, options, type });
-  useEffect(() => {
-    if (!canvasRef.current) return;
-    if (chartRef.current) chartRef.current.destroy();
-    chartRef.current = new ChartLib.Chart(canvasRef.current, { type, data, options });
-    return () => { chartRef.current?.destroy(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sig]);
-  return <div className={heightClass}><canvas ref={canvasRef} /></div>;
-}
-
 function Dropzone({ onFiles, disabled }: { onFiles: (files: File[]) => void; disabled?: boolean }) {
   const [drag, setDrag] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -357,43 +339,28 @@ function TripForm({ onSave, onCancel }: { onSave: (t: Trip) => void; onCancel: (
 ----------------------------------------------------------------*/
 interface SetupStep { key: string; label: string; done: boolean; onGo: () => void; }
 
-function SetupCard({ steps }: { steps: SetupStep[] }) {
-  const doneCount = steps.filter((s) => s.done).length;
-  const allDone = doneCount === steps.length;
+function TodayCard({ steps }: { steps: SetupStep[] }) {
+  const allDone = steps.every((s) => s.done);
   if (allDone) {
     return (
       <Card className="p-4 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL_TINT }}>
-          <CheckCircle2 size={18} color={TEAL_DARK} />
+        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL_TINT }}>
+          <CheckCircle2 size={16} color={TEAL_DARK} />
         </div>
-        <div>
-          <div className="text-sm font-semibold" style={{ color: NAVY }}>You're set up</div>
-          <div className="text-xs" style={{ color: "#8A93A3" }}>TaxMate has what it needs to start estimating your refund properly.</div>
-        </div>
+        <div className="text-sm font-semibold" style={{ color: NAVY }}>You're all caught up</div>
       </Card>
     );
   }
   return (
     <Card className="p-5">
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-2">
-          <Sparkles size={16} color={TEAL_DARK} />
-          <span className="text-sm font-semibold" style={{ color: NAVY }}>Start here</span>
-        </div>
-        <span className="text-xs font-medium tabular" style={{ color: "#8A93A3" }}>{doneCount}/{steps.length} done</span>
-      </div>
-      <p className="text-xs mb-4" style={{ color: "#8A93A3" }}>A few quick steps and TaxMate can start estimating your refund properly.</p>
-      <div className="w-full h-1.5 rounded-full bg-[#EEF0F4] mb-4 overflow-hidden">
-        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${(doneCount / steps.length) * 100}%`, backgroundColor: TEAL }} />
-      </div>
-      <div className="grid sm:grid-cols-2 gap-2">
+      <span className="text-sm font-semibold" style={{ color: NAVY }}>Today</span>
+      <div className="mt-2">
         {steps.map((s) => (
-          <button key={s.key} onClick={s.onGo} disabled={s.done} className="flex items-center gap-2.5 p-3 rounded-xl border text-left transition disabled:cursor-default" style={{ borderColor: s.done ? TEAL_TINT : GREY_LINE, backgroundColor: s.done ? TEAL_TINT : "#FBFBFC" }}>
+          <button key={s.key} onClick={s.onGo} disabled={s.done} className="w-full flex items-center gap-3 py-2 text-left transition disabled:cursor-default">
             <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0" style={s.done ? { backgroundColor: TEAL } : { border: "1.5px solid #D7DBE3" }}>
               {s.done && <Check size={12} color="#fff" strokeWidth={3} />}
             </div>
-            <span className="text-xs font-medium flex-1" style={{ color: s.done ? TEAL_DARK : NAVY }}>{s.label}</span>
-            {!s.done && <ArrowRight size={13} color="#B7BEC9" />}
+            <span className="text-sm flex-1" style={s.done ? { color: "#B7BEC9", textDecoration: "line-through" } : { color: NAVY, fontWeight: 500 }}>{s.label}</span>
           </button>
         ))}
       </div>
@@ -430,59 +397,65 @@ function QuickSetupCard({ occupation, income, onSave, disabled }: { occupation: 
   );
 }
 
-function TopQuickPanel({ onUpload, onLogTravel, disabled }: { onUpload: () => void; onLogTravel: () => void; disabled?: boolean }) {
-  return (
-    <div className="grid grid-cols-2 gap-4">
-      <button
-        onClick={onUpload}
-        disabled={disabled}
-        className="flex items-center gap-3 p-5 rounded-2xl border bg-white text-left shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5"
-        style={{ borderColor: GREY_LINE }}
-      >
-        <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL_TINT }}>
-          <UploadCloud size={20} color={TEAL_DARK} />
-        </div>
-        <div>
-          <div className="text-sm font-semibold" style={{ color: NAVY }}>Upload receipt</div>
-          <div className="text-xs mt-0.5" style={{ color: "#8A93A3" }}>Snap it, sort it later</div>
-        </div>
-      </button>
-      <button
-        onClick={onLogTravel}
-        disabled={disabled}
-        className="flex items-center gap-3 p-5 rounded-2xl border bg-white text-left shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5"
-        style={{ borderColor: GREY_LINE }}
-      >
-        <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL_TINT }}>
-          <Car size={20} color={TEAL_DARK} />
-        </div>
-        <div>
-          <div className="text-sm font-semibold" style={{ color: NAVY }}>Log travel</div>
-          <div className="text-xs mt-0.5" style={{ color: "#8A93A3" }}>Add a trip to your logbook</div>
-        </div>
-      </button>
-    </div>
-  );
-}
+function FloatingActionButton({ onScan, onLogTrip, onAddExpense, onImportCsv, disabled }: { onScan: () => void; onLogTrip: () => void; onAddExpense: () => void; onImportCsv: () => void; disabled?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const pressTimer = useRef<number | null>(null);
+  const longPressed = useRef(false);
 
-function QuickActionsBar({ actions, disabled }: { actions: { label: string; icon: React.ElementType; onClick: () => void }[]; disabled?: boolean }) {
+  const items = [
+    { label: "Scan Receipt", icon: Camera, onClick: onScan },
+    { label: "Log Trip", icon: Car, onClick: onLogTrip },
+    { label: "Add Expense", icon: Receipt, onClick: onAddExpense },
+    { label: "Import CSV", icon: Upload, onClick: onImportCsv },
+  ];
+
+  const handlePointerDown = () => {
+    if (disabled) return;
+    longPressed.current = false;
+    pressTimer.current = window.setTimeout(() => { longPressed.current = true; onScan(); }, 500);
+  };
+  const handlePointerUp = () => { if (pressTimer.current) { window.clearTimeout(pressTimer.current); pressTimer.current = null; } };
+  const handleClick = () => {
+    if (longPressed.current) { longPressed.current = false; return; }
+    setOpen((v) => !v);
+  };
+
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-      {actions.map((a) => (
-        <button
-          key={a.label}
-          onClick={a.onClick}
-          disabled={disabled}
-          className="flex flex-col items-center gap-2 p-3.5 rounded-2xl border bg-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:shadow-card-hover hover:not-disabled:-translate-y-0.5"
-          style={{ borderColor: GREY_LINE }}
-        >
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: TEAL_TINT }}>
-            <a.icon size={16} color={TEAL_DARK} />
+    <>
+      {open && <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />}
+      <div className="fixed right-4 sm:right-6 bottom-20 lg:bottom-6 z-40 flex flex-col items-end gap-3">
+        {open && (
+          <div className="flex flex-col items-end gap-2 mb-1">
+            {items.map((it, i) => (
+              <button
+                key={it.label}
+                onClick={() => { it.onClick(); setOpen(false); }}
+                disabled={disabled}
+                className="fade-up flex items-center gap-2.5 pl-4 pr-3 py-2.5 rounded-full bg-white shadow-card border text-sm font-semibold transition disabled:opacity-50 hover:brightness-95"
+                style={{ borderColor: GREY_LINE, color: NAVY, animationDelay: `${i * 30}ms` }}
+              >
+                {it.label}
+                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL_TINT }}>
+                  <it.icon size={15} color={TEAL_DARK} />
+                </div>
+              </button>
+            ))}
           </div>
-          <span className="text-[11px] font-medium text-center leading-tight" style={{ color: NAVY }}>{a.label}</span>
+        )}
+        <button
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerUp}
+          onClick={handleClick}
+          disabled={disabled}
+          aria-label={open ? "Close quick actions" : "Quick actions"}
+          className="w-14 h-14 rounded-full flex items-center justify-center shadow-card-hover transition-transform duration-200 disabled:opacity-50"
+          style={{ backgroundColor: TEAL, transform: open ? "rotate(45deg)" : "none" }}
+        >
+          <Plus size={24} color="#fff" />
         </button>
-      ))}
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -628,9 +601,9 @@ export default function App() {
     });
   };
 
-  const openReceiptQuickAdd = (cat: CategoryKey) => {
+  const openManualExpenseEntry = () => {
     if (demoMode) return;
-    setReceiptFormCategoryLock(cat);
+    setReceiptFormCategoryLock(undefined);
     setShowReceiptForm(true);
     setReceiptCategoryFilter("all");
     setTab("receipts");
@@ -702,14 +675,6 @@ export default function App() {
   const vehicleEvidenceComplete = logbookReady && businessKm > 0;
   const currentOdometer = (Number(activeData.profile.vehicle.openingOdometer) || 0) + totalKm;
 
-  const monthlyTotals = FY_MONTHS.map(() => 0);
-  receiptsWithNum.forEach((r) => {
-    if (!r.date) return;
-    const d = new Date(r.date);
-    const idx = (d.getMonth() - 6 + 12) % 12;
-    monthlyTotals[idx] += r.amount;
-  });
-
   const categoryTotals = CATEGORIES.map((c) => ({
     ...c,
     total: receiptsWithNum.filter((r) => r.category === c.key).reduce((s, r) => s + r.amount, 0),
@@ -749,20 +714,11 @@ export default function App() {
   };
 
   const setupSteps: SetupStep[] = [
-    { key: "vehicle", label: "Add vehicle details", done: !!(activeData.profile.vehicle.make && activeData.profile.vehicle.rego), onGo: () => setTab("vehicle") },
-    { key: "odometer", label: "Enter opening odometer", done: (Number(activeData.profile.vehicle.openingOdometer) || 0) > 0, onGo: () => setTab("vehicle") },
-    { key: "receipt", label: "Upload your first receipt", done: receiptsWithNum.length > 0, onGo: () => setTab("receipts") },
-    { key: "logbook", label: "Start your 12-week logbook", done: trips.length > 0, onGo: () => setTab("vehicle") },
+    { key: "vehicle", label: "Vehicle added", done: !!(activeData.profile.vehicle.make && activeData.profile.vehicle.rego), onGo: () => setTab("vehicle") },
+    { key: "odometer", label: "Opening odometer entered", done: (Number(activeData.profile.vehicle.openingOdometer) || 0) > 0, onGo: () => setTab("vehicle") },
+    { key: "receipt", label: missingDetailsCount > 0 ? `${missingDetailsCount} receipt${missingDetailsCount === 1 ? "" : "s"} need${missingDetailsCount === 1 ? "s" : ""} details` : "Upload your first receipt", done: receiptsWithNum.length > 0 && missingDetailsCount === 0, onGo: () => setTab("receipts") },
+    { key: "logbook", label: trips.length > 0 ? `Continue logbook — ${Math.min(daysElapsed, 84)}/84 days` : "Start your logbook", done: logbookReady, onGo: () => setTab("vehicle") },
     { key: "income", label: "Add tax withheld", done: withheld > 0, onGo: () => setTab("expenses") },
-  ];
-
-  const quickActions = [
-    { label: "Add tool receipt", icon: Wrench, onClick: () => openReceiptQuickAdd("tools") },
-    { label: "Add fuel receipt", icon: Fuel, onClick: () => openReceiptQuickAdd("vehicle") },
-    { label: "Add PPE/clothing", icon: HardHat, onClick: () => openReceiptQuickAdd("ppe") },
-    { label: "Add TAFE cost", icon: GraduationCap, onClick: () => openReceiptQuickAdd("tafe") },
-    { label: "Add work trip", icon: Car, onClick: () => { if (demoMode) return; setTab("vehicle"); setShowTripForm(true); } },
-    { label: "Import Driversnote CSV", icon: Upload, onClick: () => { if (demoMode) return; csvInputRef.current?.click(); } },
   ];
 
   const NAV: { key: TabKey; label: string; icon: React.ElementType }[] = [
@@ -829,7 +785,7 @@ export default function App() {
           </div>
         )}
 
-        <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-10 py-6 lg:py-8 pt-[68px] lg:pt-8 pb-24 lg:pb-10 max-w-6xl mx-auto w-full">
+        <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-10 py-6 lg:py-8 pt-[68px] lg:pt-8 pb-36 lg:pb-24 max-w-6xl mx-auto w-full">
           {demoMode && (
             <div className="mb-5 flex items-center justify-between gap-3 px-4 py-3 rounded-2xl fade-up" style={{ backgroundColor: TEAL_TINT }}>
               <div className="flex items-center gap-2 text-sm font-medium" style={{ color: TEAL_DARK }}><Sparkles size={15} />Viewing sample apprentice data — nothing here is saved</div>
@@ -847,76 +803,54 @@ export default function App() {
                 <Pill tone={unfiledCount > 0 ? "amber" : "teal"}>{unfiledCount > 0 ? `${unfiledCount} receipts to file` : receiptsWithNum.length ? "All receipts filed" : "No receipts yet"}</Pill>
               </div>
 
-              <TopQuickPanel onUpload={quickUploadReceipt} onLogTravel={quickLogTravel} disabled={demoMode} />
-
-              {!activeData.profile.quickSetupDone && (
+              {!activeData.profile.quickSetupDone ? (
                 <QuickSetupCard
                   occupation={activeData.profile.occupation}
                   income={activeData.profile.income}
                   onSave={saveQuickSetup}
                   disabled={demoMode}
                 />
+              ) : (
+                <Card className="p-6 text-center" delay={0}>
+                  <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#8A93A3" }}>Estimated Refund</div>
+                  <div className="text-4xl font-bold tabular mt-1" style={{ color: NAVY }}><AnimatedNumber value={Math.max(0, estimatedRefund)} /></div>
+                  <div className="text-xs mt-2" style={{ color: "#8A93A3" }}>{fmt(income)} income · {fmt(totalDeductions)} deductions logged</div>
+                </Card>
               )}
 
-              <SetupCard steps={setupSteps} />
-
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-                <Card className="p-5" delay={60}>
-                  <div className="flex items-center justify-between mb-2"><span className="text-xs font-medium" style={{ color: "#8A93A3" }}>Total Deductions</span><TrendingUp size={15} color={TEAL} /></div>
-                  <div className="text-2xl font-bold tabular" style={{ color: NAVY }}><AnimatedNumber value={totalDeductions} /></div>
-                  <div className="text-xs mt-1" style={{ color: "#8A93A3" }}>from {fmt(totalSpend)} logged spend{laundryAdded ? ` + ${fmt(laundryEstimate)} laundry` : ""}</div>
-                </Card>
-                <Card className="p-5" delay={100}>
-                  <div className="flex items-center justify-between mb-2"><span className="text-xs font-medium" style={{ color: "#8A93A3" }}>Receipts Logged</span><Receipt size={15} color={TEAL} /></div>
-                  <div className="text-2xl font-bold tabular" style={{ color: NAVY }}>{receiptsWithNum.length}</div>
-                  <div className="text-xs mt-1" style={{ color: "#8A93A3" }}>{unfiledCount} awaiting details</div>
-                </Card>
-                <Card className="p-5" delay={140}>
-                  <div className="flex items-center justify-between mb-2"><span className="text-xs font-medium" style={{ color: "#8A93A3" }}>Business Km Share</span><MapPin size={15} color={TEAL} /></div>
-                  <div className="text-2xl font-bold tabular" style={{ color: NAVY }}>{businessPct}%</div>
-                  <div className="text-xs mt-1" style={{ color: "#8A93A3" }}>{Math.round(businessKm)} km of {Math.round(totalKm)} km logged</div>
-                </Card>
-                <Card className="p-5" delay={180}>
-                  <div className="flex items-center justify-between mb-2"><span className="text-xs font-medium" style={{ color: "#8A93A3" }}>ATO Readiness</span><ShieldCheck size={15} color={TEAL} /></div>
-                  <div className="text-2xl font-bold tabular" style={{ color: NAVY }}>{readinessScore}/{readinessChecks.length}</div>
-                  <div className="w-full h-1.5 rounded-full bg-[#EEF0F4] mt-2 overflow-hidden"><div className="h-full rounded-full transition-all duration-700" style={{ width: `${(readinessScore / readinessChecks.length) * 100}%`, backgroundColor: TEAL }} /></div>
-                </Card>
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={quickUploadReceipt} disabled={demoMode} className="flex flex-col items-center justify-center gap-2 py-6 rounded-2xl text-white font-semibold shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ backgroundColor: TEAL }}>
+                  <Camera size={22} />
+                  Scan Receipt
+                </button>
+                <button onClick={quickLogTravel} disabled={demoMode} className="flex flex-col items-center justify-center gap-2 py-6 rounded-2xl font-semibold border bg-white shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ borderColor: GREY_LINE, color: NAVY }}>
+                  <Car size={22} color={TEAL_DARK} />
+                  Log Trip
+                </button>
               </div>
+              <button onClick={() => setTab("checklist")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold border bg-white transition hover:brightness-95" style={{ borderColor: GREY_LINE, color: NAVY }}>
+                <ShieldCheck size={16} color={TEAL_DARK} />
+                View Progress
+              </button>
 
-              <div>
-                <SectionTitle title="Quick actions" eyebrow="Log as you go" sub="The faster you log a receipt or trip, the less scrambling at tax time." />
-                <QuickActionsBar actions={quickActions} disabled={demoMode} />
-              </div>
+              <TodayCard steps={setupSteps} />
 
-              <Card className="p-6" delay={220}>
-                <SectionTitle eyebrow="Trends" title="Monthly Spending" />
-                <ChartCanvas type="bar" data={{ labels: FY_MONTHS, datasets: [{ label: "Spend", data: monthlyTotals, backgroundColor: TEAL, borderRadius: 6, maxBarThickness: 28 }] }}
-                  options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c: any) => fmt(c.parsed.y) } } }, scales: { y: { grid: { color: "#F0F1F4" }, ticks: { callback: (v: any) => `$${v}` } }, x: { grid: { display: false } } } }}
-                  heightClass="h-64" />
-              </Card>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <Card className="p-6" delay={260}>
-                  <SectionTitle eyebrow="Breakdown" title="Deductions by Category" />
-                  {categoryTotals.some((c) => c.deductible > 0) ? (
-                    <ChartCanvas type="doughnut"
-                      data={{ labels: categoryTotals.filter((c) => c.deductible > 0).map((c) => c.label), datasets: [{ data: categoryTotals.filter((c) => c.deductible > 0).map((c) => c.deductible), backgroundColor: [TEAL, "#4FB8AF", NAVY, NAVY_SOFT, AMBER, "#7C93B8", "#B7BEC9"], borderWidth: 0 }] }}
-                      options={{ responsive: true, maintainAspectRatio: false, cutout: "68%", plugins: { legend: { position: "bottom", labels: { boxWidth: 8, font: { size: 11 }, padding: 12 } } } }}
-                      heightClass="h-64" />
-                  ) : (
-                    <EmptyState icon={Receipt} title="No deductions yet" subtitle="Add a receipt and this chart fills in automatically." />
-                  )}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Card className="p-4 text-center" delay={60}>
+                  <div className="text-xl font-bold tabular" style={{ color: NAVY }}>{receiptsWithNum.length}</div>
+                  <div className="text-[11px] mt-1" style={{ color: "#8A93A3" }}>Receipts logged</div>
                 </Card>
-                <Card className="p-6" delay={300}>
-                  <SectionTitle eyebrow="Logbook" title="Business vs Personal Km" />
-                  {totalKm > 0 ? (
-                    <ChartCanvas type="doughnut"
-                      data={{ labels: ["Business", "Personal"], datasets: [{ data: [businessKm || 0, personalKm || 0], backgroundColor: [TEAL, "#E7E9EE"], borderWidth: 0 }] }}
-                      options={{ responsive: true, maintainAspectRatio: false, cutout: "68%", plugins: { legend: { position: "bottom", labels: { boxWidth: 8, font: { size: 11 }, padding: 12 } } } }}
-                      heightClass="h-64" />
-                  ) : (
-                    <EmptyState icon={Car} title="No trips logged yet" subtitle="Start your 12-week logbook to see your business-use split here." />
-                  )}
+                <Card className="p-4 text-center" delay={100}>
+                  <div className="text-xl font-bold tabular" style={{ color: NAVY }}>{trips.length}</div>
+                  <div className="text-[11px] mt-1" style={{ color: "#8A93A3" }}>Trips logged</div>
+                </Card>
+                <Card className="p-4 text-center" delay={140}>
+                  <div className="text-xl font-bold tabular" style={{ color: NAVY }}><AnimatedNumber value={totalDeductions} /></div>
+                  <div className="text-[11px] mt-1" style={{ color: "#8A93A3" }}>Est. deductions</div>
+                </Card>
+                <Card className="p-4 text-center" delay={180}>
+                  <div className="text-xl font-bold tabular" style={{ color: NAVY }}>{Math.round(logbookProgress * 100)}%</div>
+                  <div className="text-[11px] mt-1" style={{ color: "#8A93A3" }}>Logbook</div>
                 </Card>
               </div>
             </div>
@@ -937,7 +871,7 @@ export default function App() {
                 </div>
                 <div className="px-2">
                   {filteredReceipts.length === 0 ? (
-                    <EmptyState icon={Receipt} title="No receipts here yet" subtitle="Drag a photo into the box above, or use a quick action on Overview — TaxMate will sort it into the right category." />
+                    <EmptyState icon={Receipt} title="No receipts here yet" subtitle="Drag a photo into the box above, or tap the + button to scan one — TaxMate will sort it into the right category." />
                   ) : (
                     filteredReceipts.map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} thumb={thumbs[r.id]} scanning={scanningIds.has(r.id)} />)
                   )}
@@ -1041,7 +975,7 @@ export default function App() {
               <Card className="p-2 sm:p-4">
                 <div className="px-2">
                   {receiptsWithNum.filter((r) => r.category === "vehicle").length === 0 ? (
-                    <EmptyState icon={Fuel} title="No vehicle expenses yet" subtitle={'Use the "Add fuel receipt" quick action on Overview, or log fuel, servicing or insurance here as "Vehicle & Fuel".'} />
+                    <EmptyState icon={Fuel} title="No vehicle expenses yet" subtitle={'Scan a fuel, servicing or insurance receipt and tag it as "Vehicle & Fuel".'} />
                   ) : (
                     receiptsWithNum.filter((r) => r.category === "vehicle").map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} thumb={thumbs[r.id]} scanning={scanningIds.has(r.id)} />)
                   )}
@@ -1052,7 +986,7 @@ export default function App() {
 
           {tab === "expenses" && (
             <div className="space-y-6">
-              <SectionTitle title="Deductions" eyebrow="Tools · Clothing · PPE · Phone · TAFE" sub="Tap a category to filter, or use a quick action on Overview to add straight into it." />
+              <SectionTitle title="Deductions" eyebrow="Tools · Clothing · PPE · Phone · TAFE" sub="Tap a category to filter, or scan a receipt to add straight into it." />
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {categoryTotals.filter((c) => c.key !== "vehicle" && c.key !== "other").map((c, i) => (
                   <button key={c.key} onClick={() => setReceiptCategoryFilter(c.key)} className="text-left">
@@ -1178,6 +1112,16 @@ export default function App() {
           </button>
         ))}
       </div>
+
+      {!showReceiptForm && !showTripForm && (
+        <FloatingActionButton
+          onScan={quickUploadReceipt}
+          onLogTrip={quickLogTravel}
+          onAddExpense={openManualExpenseEntry}
+          onImportCsv={() => { if (demoMode) return; csvInputRef.current?.click(); }}
+          disabled={demoMode}
+        />
+      )}
     </div>
   );
 }
