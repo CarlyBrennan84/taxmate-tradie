@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   LayoutDashboard, Receipt, Car, Wrench, Shirt, HardHat, Smartphone,
-  GraduationCap, FileText, UploadCloud, Plus, Trash2, ChevronRight, Menu,
+  GraduationCap, FileText, Plus, Trash2, ChevronRight, Menu,
   Download, Printer, TrendingUp, Gauge, MapPin, Sparkles, Camera,
   Check, CheckCircle2, AlertTriangle, Fuel, Upload, ShieldCheck, X,
+  Search, SlidersHorizontal,
 } from "lucide-react";
 import type { AppData, Receipt as ReceiptT, Trip, CategoryKey } from "./types";
 import { loadData, saveData, loadDemoFlag, saveDemoFlag } from "./lib/storage";
@@ -204,39 +205,12 @@ function EmptyState({ icon: Icon, title, subtitle, action }: { icon: React.Eleme
   );
 }
 
-function Dropzone({ onFiles, disabled }: { onFiles: (files: File[]) => void; disabled?: boolean }) {
-  const [drag, setDrag] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  return (
-    <div
-      onDragOver={(e) => { e.preventDefault(); if (!disabled) setDrag(true); }}
-      onDragLeave={() => setDrag(false)}
-      onDrop={(e) => { e.preventDefault(); setDrag(false); if (!disabled && e.dataTransfer.files?.length) onFiles(Array.from(e.dataTransfer.files)); }}
-      onClick={() => !disabled && inputRef.current?.click()}
-      className={`rounded-2xl border-2 border-dashed transition-all duration-200 flex flex-col items-center justify-center text-center py-10 px-4 ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"} ${drag ? "scale-[1.01]" : ""}`}
-      style={{ borderColor: drag ? TEAL : "#D7DBE3", backgroundColor: drag ? TEAL_TINT : "#FBFBFC" }}
-    >
-      <div className="w-11 h-11 rounded-full flex items-center justify-center mb-3" style={{ backgroundColor: TEAL_TINT }}>
-        <UploadCloud size={20} color={TEAL_DARK} />
-      </div>
-      <p className="text-sm font-medium" style={{ color: NAVY }}>Drag receipts here, or click to browse</p>
-      <p className="text-xs mt-1" style={{ color: "#8A93A3" }}>JPG, PNG or PDF — one at a time or in a batch</p>
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        accept="image/*,.pdf"
-        className="hidden"
-        onChange={(e) => { if (e.target.files?.length) onFiles(Array.from(e.target.files)); e.target.value = ""; }}
-      />
-    </div>
+function ReceiptForm({ onSave, onCancel, categoryLock, initial }: { onSave: (r: ReceiptT) => void; onCancel: () => void; categoryLock?: CategoryKey; initial?: ReceiptT }) {
+  const [r, setR] = useState<{ id: string; date: string; vendor: string; category: CategoryKey; amount: string; workPct: string; filed: boolean; notes: string }>(
+    initial
+      ? { id: initial.id, date: initial.date, vendor: initial.vendor, category: initial.category, amount: initial.amount ? String(initial.amount) : "", workPct: String(initial.workPct), filed: initial.filed, notes: initial.notes || "" }
+      : { id: uid(), date: todayISO(), vendor: "", category: categoryLock || "tools", amount: "", workPct: "100", filed: true, notes: "" }
   );
-}
-
-function ReceiptForm({ onSave, onCancel, categoryLock }: { onSave: (r: ReceiptT) => void; onCancel: () => void; categoryLock?: CategoryKey }) {
-  const [r, setR] = useState<{ id: string; date: string; vendor: string; category: CategoryKey; amount: string; workPct: string; filed: boolean; notes: string }>({
-    id: uid(), date: todayISO(), vendor: "", category: categoryLock || "tools", amount: "", workPct: "100", filed: true, notes: "",
-  });
   useEffect(() => { if (categoryLock) setR((p) => ({ ...p, category: categoryLock })); }, [categoryLock]);
   const set = <K extends keyof typeof r>(k: K, v: (typeof r)[K]) => setR((p) => ({ ...p, [k]: v }));
   return (
@@ -269,19 +243,19 @@ function ReceiptForm({ onSave, onCancel, categoryLock }: { onSave: (r: ReceiptT)
           className="px-4 py-2 rounded-xl text-sm font-semibold text-white shadow-sm hover:brightness-110 transition"
           style={{ backgroundColor: TEAL }}
         >
-          Save receipt
+          {initial ? "Save changes" : "Save receipt"}
         </button>
       </div>
     </div>
   );
 }
 
-function ReceiptRow({ r, onDelete, thumb, scanning }: { r: ReceiptT; onDelete: (id: string) => void; thumb?: string; scanning?: boolean }) {
+function ReceiptRow({ r, onDelete, onEdit, thumb, scanning }: { r: ReceiptT; onDelete: (id: string) => void; onEdit: (r: ReceiptT) => void; thumb?: string; scanning?: boolean }) {
   const ded = r.amount * (r.workPct / 100);
   const cat = CATEGORIES.find((c) => c.key === r.category);
   const incomplete = !r.vendor || !r.amount;
   return (
-    <div className="flex items-center gap-3 py-3 px-1 border-b last:border-0" style={{ borderColor: GREY_LINE }}>
+    <div role="button" tabIndex={0} onClick={() => !scanning && onEdit(r)} onKeyDown={(e) => { if (!scanning && (e.key === "Enter" || e.key === " ")) onEdit(r); }} className={`w-full flex items-center gap-3 py-3 px-1 border-b last:border-0 text-left transition hover:bg-[#FBFBFC] ${scanning ? "cursor-default" : "cursor-pointer"}`} style={{ borderColor: GREY_LINE }}>
       <div className="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL_TINT }}>
         {thumb ? <img src={thumb} alt="" className={`w-full h-full object-cover ${scanning ? "animate-pulse" : ""}`} /> : cat && <cat.icon size={16} color={TEAL_DARK} />}
       </div>
@@ -299,7 +273,7 @@ function ReceiptRow({ r, onDelete, thumb, scanning }: { r: ReceiptT; onDelete: (
           Reading receipt…
         </div>
       ) : incomplete ? <Pill tone="amber">Needs details</Pill> : r.filed ? <Pill tone="teal">Filed</Pill> : <Pill tone="amber">To file</Pill>}
-      <button onClick={() => onDelete(r.id)} className="p-1.5 rounded-lg text-[#B7BEC9] hover:text-[#C4573F] hover:bg-[#FBEAE6] transition flex-shrink-0"><Trash2 size={15} /></button>
+      <button onClick={(e) => { e.stopPropagation(); onDelete(r.id); }} className="p-1.5 rounded-lg text-[#B7BEC9] hover:text-[#C4573F] hover:bg-[#FBEAE6] transition flex-shrink-0"><Trash2 size={15} /></button>
     </div>
   );
 }
@@ -519,6 +493,10 @@ export default function App() {
   const [showReceiptForm, setShowReceiptForm] = useState(false);
   const [receiptFormCategoryLock, setReceiptFormCategoryLock] = useState<CategoryKey | undefined>(undefined);
   const [receiptCategoryFilter, setReceiptCategoryFilter] = useState<CategoryKey | "all">("all");
+  const [showReceiptFilters, setShowReceiptFilters] = useState(false);
+  const [receiptSearch, setReceiptSearch] = useState("");
+  const [receiptSegment, setReceiptSegment] = useState<"needsAttention" | "recent" | "completed">("recent");
+  const [editingReceipt, setEditingReceipt] = useState<ReceiptT | null>(null);
   const [showTripForm, setShowTripForm] = useState(false);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [scanningIds, setScanningIds] = useState<Set<string>>(new Set());
@@ -550,6 +528,7 @@ export default function App() {
 
   const addReceipt = (r: ReceiptT) => { update((d) => { d.receipts.unshift(r); return d; }); setShowReceiptForm(false); setReceiptFormCategoryLock(undefined); };
   const deleteReceipt = (id: string) => update((d) => { d.receipts = d.receipts.filter((r) => r.id !== id); return d; });
+  const saveReceiptEdit = (r: ReceiptT) => { update((d) => { d.receipts = d.receipts.map((existing) => (existing.id === r.id ? r : existing)); return d; }); setEditingReceipt(null); };
   const addTrip = (t: Trip) => { update((d) => { d.trips.unshift(t); return d; }); setShowTripForm(false); };
   const deleteTrip = (id: string) => update((d) => { d.trips = d.trips.filter((t) => t.id !== id); return d; });
   const setProfile = <K extends keyof AppData["profile"]>(k: K, v: AppData["profile"][K]) => update((d) => { d.profile[k] = v; return d; });
@@ -732,6 +711,17 @@ export default function App() {
 
   const filteredReceipts = receiptCategoryFilter === "all" ? receiptsWithNum : receiptsWithNum.filter((r) => r.category === receiptCategoryFilter);
 
+  const receiptIsIncomplete = (r: ReceiptT) => !r.vendor || !r.amount || r.amount <= 0;
+  const receiptSegments: { key: "needsAttention" | "recent" | "completed"; label: string; list: ReceiptT[] }[] = [
+    { key: "needsAttention", label: "Needs Attention", list: filteredReceipts.filter(receiptIsIncomplete) },
+    { key: "recent", label: "Recent", list: filteredReceipts },
+    { key: "completed", label: "Completed", list: filteredReceipts.filter((r) => !receiptIsIncomplete(r) && r.filed) },
+  ];
+  const receiptSearchLower = receiptSearch.trim().toLowerCase();
+  const receiptsForTab = (receiptSegments.find((s) => s.key === receiptSegment)?.list || filteredReceipts).filter(
+    (r) => !receiptSearchLower || r.vendor.toLowerCase().includes(receiptSearchLower) || (r.notes || "").toLowerCase().includes(receiptSearchLower)
+  );
+
   /* ---------------- render ---------------- */
   return (
     <div className="min-h-screen w-full font-sans" style={{ backgroundColor: GREY_BG }}>
@@ -857,23 +847,56 @@ export default function App() {
           )}
 
           {tab === "receipts" && (
-            <div className="space-y-6">
-              <SectionTitle title="Receipt Tracker" eyebrow="Every deduction, in one place" sub="Upload as you go — TaxMate sorts them by category and works out what's deductible."
-                action={<button onClick={() => { setReceiptFormCategoryLock(undefined); setShowReceiptForm((v) => !v); }} disabled={demoMode} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white shadow-sm hover:brightness-110 transition disabled:opacity-50" style={{ backgroundColor: TEAL }}><Plus size={15} />Add receipt</button>} />
-              <Card className="p-6"><Dropzone onFiles={handleFiles} disabled={demoMode} /></Card>
-              {showReceiptForm && !demoMode && <ReceiptForm onSave={addReceipt} onCancel={() => { setShowReceiptForm(false); setReceiptFormCategoryLock(undefined); }} categoryLock={receiptFormCategoryLock} />}
-              <Card className="p-2 sm:p-4">
-                <div className="flex items-center gap-2 flex-wrap px-2 pt-2 pb-3">
+            <div className="space-y-4">
+              <SectionTitle title="Receipts" />
+
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search size={15} color="#B7BEC9" className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input value={receiptSearch} onChange={(e) => setReceiptSearch(e.target.value)} placeholder="Search receipts…" className={`${inputCls} pl-9`} />
+                </div>
+                <button
+                  onClick={() => setShowReceiptFilters((v) => !v)}
+                  className="relative p-2.5 rounded-xl border flex-shrink-0 transition"
+                  style={showReceiptFilters || receiptCategoryFilter !== "all" ? { backgroundColor: TEAL_TINT, borderColor: TEAL_TINT, color: TEAL_DARK } : { borderColor: GREY_LINE, color: NAVY_SOFT }}
+                  aria-label="Filters"
+                >
+                  <SlidersHorizontal size={16} />
+                  {receiptCategoryFilter !== "all" && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full" style={{ backgroundColor: TEAL }} />}
+                </button>
+              </div>
+
+              {showReceiptFilters && (
+                <div className="flex items-center gap-2 flex-wrap fade-up">
                   <button onClick={() => setReceiptCategoryFilter("all")} className="px-3 py-1.5 rounded-full text-xs font-medium transition" style={receiptCategoryFilter === "all" ? { backgroundColor: NAVY, color: "#fff" } : { backgroundColor: "#F0F1F4", color: "#5B6472" }}>All</button>
                   {CATEGORIES.map((c) => (
                     <button key={c.key} onClick={() => setReceiptCategoryFilter(c.key)} className="px-3 py-1.5 rounded-full text-xs font-medium transition" style={receiptCategoryFilter === c.key ? { backgroundColor: NAVY, color: "#fff" } : { backgroundColor: "#F0F1F4", color: "#5B6472" }}>{c.label}</button>
                   ))}
                 </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                {receiptSegments.map((s) => (
+                  <button
+                    key={s.key}
+                    onClick={() => setReceiptSegment(s.key)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium transition flex-1 justify-center"
+                    style={receiptSegment === s.key ? { backgroundColor: TEAL_TINT, color: TEAL_DARK } : { backgroundColor: "#F0F1F4", color: "#5B6472" }}
+                  >
+                    {s.label}
+                    {s.key === "needsAttention" && s.list.length > 0 && (
+                      <span className="text-[10px] font-bold px-1.5 rounded-full" style={{ backgroundColor: AMBER, color: "#fff" }}>{s.list.length}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              <Card className="p-2 sm:p-4">
                 <div className="px-2">
-                  {filteredReceipts.length === 0 ? (
-                    <EmptyState icon={Receipt} title="No receipts here yet" subtitle="Drag a photo into the box above, or tap the + button to scan one — TaxMate will sort it into the right category." />
+                  {receiptsForTab.length === 0 ? (
+                    <EmptyState icon={Receipt} title="Nothing here" subtitle="Tap the + button to scan a receipt — TaxMate will sort it into the right category." />
                   ) : (
-                    filteredReceipts.map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} thumb={thumbs[r.id]} scanning={scanningIds.has(r.id)} />)
+                    receiptsForTab.map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} onEdit={setEditingReceipt} thumb={thumbs[r.id]} scanning={scanningIds.has(r.id)} />)
                   )}
                 </div>
               </Card>
@@ -977,7 +1000,7 @@ export default function App() {
                   {receiptsWithNum.filter((r) => r.category === "vehicle").length === 0 ? (
                     <EmptyState icon={Fuel} title="No vehicle expenses yet" subtitle={'Scan a fuel, servicing or insurance receipt and tag it as "Vehicle & Fuel".'} />
                   ) : (
-                    receiptsWithNum.filter((r) => r.category === "vehicle").map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} thumb={thumbs[r.id]} scanning={scanningIds.has(r.id)} />)
+                    receiptsWithNum.filter((r) => r.category === "vehicle").map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} onEdit={setEditingReceipt} thumb={thumbs[r.id]} scanning={scanningIds.has(r.id)} />)
                   )}
                 </div>
               </Card>
@@ -1030,9 +1053,9 @@ export default function App() {
                 </div>
                 <div className="px-2">
                   {filteredReceipts.filter((r) => receiptCategoryFilter !== "all" || r.category !== "vehicle").length === 0 ? (
-                    <EmptyState icon={Wrench} title="Nothing here yet" subtitle="Add a receipt from Overview's quick actions, or use the Add receipt button on the Receipts tab." />
+                    <EmptyState icon={Wrench} title="Nothing here yet" subtitle="Tap the + button to scan a receipt straight into this category." />
                   ) : (
-                    filteredReceipts.filter((r) => receiptCategoryFilter !== "all" || r.category !== "vehicle").map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} thumb={thumbs[r.id]} scanning={scanningIds.has(r.id)} />)
+                    filteredReceipts.filter((r) => receiptCategoryFilter !== "all" || r.category !== "vehicle").map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} onEdit={setEditingReceipt} thumb={thumbs[r.id]} scanning={scanningIds.has(r.id)} />)
                   )}
                 </div>
               </Card>
@@ -1113,7 +1136,20 @@ export default function App() {
         ))}
       </div>
 
-      {!showReceiptForm && !showTripForm && (
+      {(showReceiptForm || editingReceipt) && !demoMode && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4" onClick={() => { setShowReceiptForm(false); setReceiptFormCategoryLock(undefined); setEditingReceipt(null); }}>
+          <div className="w-full sm:max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <ReceiptForm
+              initial={editingReceipt || undefined}
+              categoryLock={editingReceipt ? undefined : receiptFormCategoryLock}
+              onSave={editingReceipt ? saveReceiptEdit : addReceipt}
+              onCancel={() => { setShowReceiptForm(false); setReceiptFormCategoryLock(undefined); setEditingReceipt(null); }}
+            />
+          </div>
+        </div>
+      )}
+
+      {!showReceiptForm && !showTripForm && !editingReceipt && (
         <FloatingActionButton
           onScan={quickUploadReceipt}
           onLogTrip={quickLogTravel}
