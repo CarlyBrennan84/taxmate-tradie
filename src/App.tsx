@@ -1025,10 +1025,6 @@ export default function App() {
             <button onClick={demoMode ? disableDemo : enableDemo} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold border transition" style={demoMode ? { backgroundColor: AMBER_TINT, borderColor: AMBER_TINT, color: "#8A5A0F" } : { borderColor: GREY_LINE, color: NAVY_SOFT }}>
               {demoMode ? <><X size={13} /> Clear demo data</> : <><Sparkles size={13} /> View sample apprentice data</>}
             </button>
-            <div className="rounded-2xl p-4" style={{ backgroundColor: NAVY }}>
-              <Sparkles size={16} color={TEAL} />
-              <p className="text-xs text-white/80 mt-2 leading-relaxed">Receipt scanning and Supabase sync are next on the roadmap.</p>
-            </div>
           </div>
         </aside>
 
