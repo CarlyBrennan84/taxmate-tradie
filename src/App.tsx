@@ -282,29 +282,61 @@ function TripForm({ onSave, onCancel }: { onSave: (t: Trip) => void; onCancel: (
   const [t, setT] = useState<{ id: string; date: string; purpose: string; type: "business" | "personal"; km: string }>({
     id: uid(), date: todayISO(), purpose: "", type: "business", km: "",
   });
+  const kmRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { kmRef.current?.focus(); }, []);
   const set = <K extends keyof typeof t>(k: K, v: (typeof t)[K]) => setT((p) => ({ ...p, [k]: v }));
+  const canSave = (parseFloat(t.km) || 0) > 0;
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl border" style={{ borderColor: GREY_LINE, backgroundColor: "#FBFBFC" }}>
-      <Field label="Date"><input type="date" value={t.date} onChange={(e) => set("date", e.target.value)} className={inputCls} /></Field>
-      <Field label="Purpose"><input value={t.purpose} onChange={(e) => set("purpose", e.target.value)} placeholder="Site visit — Preston" className={inputCls} /></Field>
-      <Field label="Trip type">
-        <select value={t.type} onChange={(e) => set("type", e.target.value as "business" | "personal")} className={inputCls}>
-          <option value="business">Business</option>
-          <option value="personal">Personal</option>
-        </select>
-      </Field>
-      <Field label="Kilometres"><input type="number" step="0.1" value={t.km} onChange={(e) => set("km", e.target.value)} placeholder="0.0" className={inputCls} /></Field>
-      <div className="col-span-2 sm:col-span-4 flex justify-end gap-2 pt-1">
+    <div className="p-5 rounded-2xl border bg-white" style={{ borderColor: GREY_LINE }}>
+      <span className="text-sm font-semibold" style={{ color: NAVY }}>Log a trip</span>
+      <div className="grid grid-cols-2 gap-3 mt-4">
+        <button onClick={() => set("type", "business")} className="py-3 rounded-xl text-sm font-semibold border transition" style={t.type === "business" ? { backgroundColor: TEAL, borderColor: TEAL, color: "#fff" } : { borderColor: GREY_LINE, color: NAVY, backgroundColor: "#FBFBFC" }}>Business</button>
+        <button onClick={() => set("type", "personal")} className="py-3 rounded-xl text-sm font-semibold border transition" style={t.type === "personal" ? { backgroundColor: NAVY, borderColor: NAVY, color: "#fff" } : { borderColor: GREY_LINE, color: NAVY, backgroundColor: "#FBFBFC" }}>Personal</button>
+      </div>
+      <div className="mt-3">
+        <Field label="Kilometres">
+          <input ref={kmRef} type="number" step="0.1" inputMode="decimal" value={t.km} onChange={(e) => set("km", e.target.value)} placeholder="0.0" className={`${inputCls} text-2xl font-bold py-3 tabular`} />
+        </Field>
+      </div>
+      <div className="grid grid-cols-2 gap-3 mt-3">
+        <Field label="Purpose (optional)"><input value={t.purpose} onChange={(e) => set("purpose", e.target.value)} placeholder="Site visit — Preston" className={inputCls} /></Field>
+        <Field label="Date"><input type="date" value={t.date} onChange={(e) => set("date", e.target.value)} className={inputCls} /></Field>
+      </div>
+      <div className="flex justify-end gap-2 pt-4">
         <button onClick={onCancel} className="px-4 py-2 rounded-xl text-sm font-medium text-[#5B6472] hover:bg-[#F0F1F4] transition">Cancel</button>
         <button
-          onClick={() => { if (!t.purpose || !t.km) return; onSave({ id: t.id, date: t.date, purpose: t.purpose, type: t.type, km: parseFloat(t.km) || 0 }); }}
-          className="px-4 py-2 rounded-xl text-sm font-semibold text-white shadow-sm hover:brightness-110 transition"
+          onClick={() => { if (!canSave) return; onSave({ id: t.id, date: t.date, purpose: t.purpose, type: t.type, km: parseFloat(t.km) || 0 }); }}
+          disabled={!canSave}
+          className="px-4 py-2 rounded-xl text-sm font-semibold text-white shadow-sm hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ backgroundColor: TEAL }}
         >
           Log trip
         </button>
       </div>
     </div>
+  );
+}
+
+function AnimatedBar({ pct, color = TEAL }: { pct: number; color?: string }) {
+  const [width, setWidth] = useState(0);
+  useEffect(() => { const t = window.setTimeout(() => setWidth(pct), 120); return () => window.clearTimeout(t); }, [pct]);
+  return (
+    <div className="w-full h-2 rounded-full bg-[#EEF0F4] overflow-hidden">
+      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${width * 100}%`, backgroundColor: color }} />
+    </div>
+  );
+}
+
+function Disclosure({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Card className="p-0 overflow-hidden">
+      <button onClick={() => setOpen((v) => !v)} className="w-full flex items-center justify-between px-5 py-4 text-left">
+        <span className="text-sm font-semibold" style={{ color: NAVY }}>{title}</span>
+        <ChevronRight size={16} color="#B7BEC9" style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
+      </button>
+      {open && <div className="px-5 pb-5 fade-up">{children}</div>}
+    </Card>
   );
 }
 
@@ -498,6 +530,7 @@ export default function App() {
   const [receiptSegment, setReceiptSegment] = useState<"needsAttention" | "recent" | "completed">("recent");
   const [editingReceipt, setEditingReceipt] = useState<ReceiptT | null>(null);
   const [showTripForm, setShowTripForm] = useState(false);
+  const [showLogbookInfo, setShowLogbookInfo] = useState(false);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [scanningIds, setScanningIds] = useState<Set<string>>(new Set());
   const [demoMode, setDemoMode] = useState<boolean>(() => loadDemoFlag());
@@ -904,42 +937,59 @@ export default function App() {
           )}
 
           {tab === "vehicle" && (
-            <div className="space-y-6">
-              <SectionTitle title="Vehicle Logbook" eyebrow="Your biggest deduction, done properly" sub="Vehicle claims are usually the single largest deduction for tradies — a complete logbook makes it easy to prove."
-                action={<button onClick={() => setShowTripForm((v) => !v)} disabled={demoMode} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white shadow-sm hover:brightness-110 transition disabled:opacity-50" style={{ backgroundColor: TEAL }}><Plus size={15} />Log a trip</button>} />
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <SectionTitle title="Logbook" />
+                <button onClick={() => setShowLogbookInfo((v) => !v)} className="text-xs font-semibold flex items-center gap-1 flex-shrink-0" style={{ color: TEAL_DARK }}>
+                  Learn more <ChevronRight size={13} style={{ transform: showLogbookInfo ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
+                </button>
+              </div>
 
-              <Card className="p-5">
-                <SectionTitle title="Vehicle details" eyebrow="For your logbook & records" />
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {showLogbookInfo && (
+                <Card className="p-4 fade-up">
+                  <p className="text-xs leading-relaxed" style={{ color: "#8A93A3" }}>Vehicle claims are usually the single largest deduction for tradies. The ATO wants a continuous 12-week period that records <b>every</b> trip — work and private, not just work journeys. Complete your 84-day logbook once — it can support your claims for up to five years while your driving pattern stays similar.</p>
+                </Card>
+              )}
+
+              <Card className="p-5" style={{ borderColor: firstTripDate ? GREY_LINE : AMBER }}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold" style={{ color: NAVY }}>Logbook progress</span>
+                  <span className="text-xs font-medium tabular" style={{ color: NAVY_SOFT }}>{Math.min(daysElapsed, 84)} / 84 days</span>
+                </div>
+                <AnimatedBar pct={logbookProgress} />
+              </Card>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Card className="p-4 text-center" delay={0}><div className="text-xl font-bold tabular" style={{ color: NAVY }}>{Math.round(businessKm)} km</div><div className="text-[11px] mt-1" style={{ color: "#8A93A3" }}>Business km</div></Card>
+                <Card className="p-4 text-center" delay={40}><div className="text-xl font-bold tabular" style={{ color: NAVY }}>{Math.round(personalKm)} km</div><div className="text-[11px] mt-1" style={{ color: "#8A93A3" }}>Personal km</div></Card>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="text-center"><span className="text-xs font-semibold tabular" style={{ color: TEAL_DARK }}>{businessPct}%</span> <span className="text-[11px]" style={{ color: "#8A93A3" }}>business use</span></div>
+                <div className="text-center"><span className="text-xs font-semibold tabular" style={{ color: NAVY_SOFT }}>{currentOdometer > 0 ? Math.round(currentOdometer).toLocaleString() : "—"}</span> <span className="text-[11px]" style={{ color: "#8A93A3" }}>est. odometer</span></div>
+              </div>
+
+              <button onClick={() => setShowTripForm(true)} disabled={demoMode} className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-white font-semibold shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ backgroundColor: TEAL }}>
+                <Car size={18} />
+                Log Trip
+              </button>
+
+              <Disclosure title="Vehicle details">
+                <div className="grid grid-cols-2 gap-3">
                   <Field label="Make"><input disabled={demoMode} value={activeData.profile.vehicle.make} onChange={(e) => setVehicle("make", e.target.value)} className={inputCls} placeholder="Toyota" /></Field>
                   <Field label="Model"><input disabled={demoMode} value={activeData.profile.vehicle.model} onChange={(e) => setVehicle("model", e.target.value)} className={inputCls} placeholder="HiLux" /></Field>
                   <Field label="Rego"><input disabled={demoMode} value={activeData.profile.vehicle.rego} onChange={(e) => setVehicle("rego", e.target.value)} className={inputCls} placeholder="1AB2CD" /></Field>
                   <Field label="Opening odometer (km)"><input disabled={demoMode} type="number" value={activeData.profile.vehicle.openingOdometer} onChange={(e) => setVehicle("openingOdometer", Number(e.target.value))} className={inputCls} /></Field>
                 </div>
-              </Card>
+              </Disclosure>
 
-              <Card className="p-5" style={{ borderColor: firstTripDate ? GREY_LINE : AMBER }}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold" style={{ color: NAVY }}>12-week continuous logbook</span>
-                  <span className="text-xs font-medium tabular" style={{ color: NAVY_SOFT }}>{Math.min(daysElapsed, 84)} / 84 days</span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-[#EEF0F4] overflow-hidden mb-3"><div className="h-full rounded-full transition-all duration-700" style={{ width: `${logbookProgress * 100}%`, backgroundColor: TEAL }} /></div>
-                <p className="text-xs leading-relaxed" style={{ color: "#8A93A3" }}>For the logbook method, the ATO wants a continuous 12-week period that records <b>every</b> trip — work and private — not just work journeys. Start it now and stay consistent; once done, it can support your claims for up to five years while your driving pattern stays similar.</p>
-              </Card>
+              <Disclosure title="Recommended method">
+                <MethodCompareCard centsPerKmEstimate={centsPerKmEstimate} logbookEstimate={logbookEstimate} logbookReady={logbookReady} businessKm={businessKm} />
+              </Disclosure>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <Card className="p-4 text-center" delay={0}><div className="text-xl font-bold tabular" style={{ color: NAVY }}>{Math.round(businessKm)}</div><div className="text-[11px] mt-1" style={{ color: "#8A93A3" }}>Business km</div></Card>
-                <Card className="p-4 text-center" delay={40}><div className="text-xl font-bold tabular" style={{ color: NAVY }}>{Math.round(personalKm)}</div><div className="text-[11px] mt-1" style={{ color: "#8A93A3" }}>Personal km</div></Card>
-                <Card className="p-4 text-center" delay={80}><div className="text-xl font-bold tabular" style={{ color: TEAL_DARK }}>{businessPct}%</div><div className="text-[11px] mt-1" style={{ color: "#8A93A3" }}>Business use</div></Card>
-                <Card className="p-4 text-center" delay={120}><div className="text-xl font-bold tabular" style={{ color: NAVY }}>{currentOdometer > 0 ? Math.round(currentOdometer).toLocaleString() : "—"}</div><div className="text-[11px] mt-1" style={{ color: "#8A93A3" }}>Current odometer (est.)</div></Card>
-              </div>
-
-              <MethodCompareCard centsPerKmEstimate={centsPerKmEstimate} logbookEstimate={logbookEstimate} logbookReady={logbookReady} businessKm={businessKm} />
-
-              <div>
-                <SectionTitle title="Import from Driversnote" eyebrow="Optional" sub="Export a CSV from Driversnote and drop it in — TaxMate will match up dates, distances and trip purposes." />
+              <Disclosure title="Import from Driversnote">
+                <p className="text-xs mb-3" style={{ color: "#8A93A3" }}>Export a CSV from Driversnote and drop it in — TaxMate will match up dates, distances and trip purposes.</p>
                 <button onClick={() => csvInputRef.current?.click()} disabled={demoMode} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition disabled:opacity-50" style={{ borderColor: GREY_LINE, color: NAVY }}><Upload size={15} />Import Driversnote CSV</button>
-              </div>
+              </Disclosure>
 
               {csvPreview && (
                 <Card className="p-5">
@@ -973,18 +1023,16 @@ export default function App() {
                 </Card>
               )}
 
-              {showTripForm && !demoMode && <TripForm onSave={addTrip} onCancel={() => setShowTripForm(false)} />}
-
               <Card className="p-2 sm:p-4">
                 <div className="px-2 pt-2 pb-1 text-xs font-semibold" style={{ color: NAVY_SOFT }}>Trip log</div>
                 <div className="px-2">
                   {trips.length === 0 ? (
-                    <EmptyState icon={Car} title="No trips logged yet" subtitle="Log your first trip above, or import a Driversnote CSV to backfill your history." />
+                    <EmptyState icon={Car} title="No trips logged yet" subtitle="Tap Log Trip above, or import a Driversnote CSV to backfill your history." />
                   ) : (
                     trips.map((t) => (
                       <div key={t.id} className="flex items-center gap-3 py-3 border-b last:border-0" style={{ borderColor: GREY_LINE }}>
                         <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: t.type === "business" ? TEAL_TINT : "#F0F1F4" }}><Car size={15} color={t.type === "business" ? TEAL_DARK : "#8A93A3"} /></div>
-                        <div className="min-w-0 flex-1"><div className="text-sm font-medium truncate" style={{ color: NAVY }}>{t.purpose}</div><div className="text-xs text-[#8A93A3]">{new Date(t.date).toLocaleDateString("en-AU", { day: "2-digit", month: "short" })}</div></div>
+                        <div className="min-w-0 flex-1"><div className="text-sm font-medium truncate" style={{ color: NAVY }}>{t.purpose || (t.type === "business" ? "Work trip" : "Personal trip")}</div><div className="text-xs text-[#8A93A3]">{new Date(t.date).toLocaleDateString("en-AU", { day: "2-digit", month: "short" })}</div></div>
                         <div className="text-sm font-semibold tabular" style={{ color: NAVY }}>{t.km} km</div>
                         <Pill tone={t.type === "business" ? "teal" : "grey"}>{t.type === "business" ? "Business" : "Personal"}</Pill>
                         <button onClick={() => deleteTrip(t.id)} className="p-1.5 rounded-lg text-[#B7BEC9] hover:text-[#C4573F] hover:bg-[#FBEAE6] transition"><Trash2 size={15} /></button>
@@ -1145,6 +1193,14 @@ export default function App() {
               onSave={editingReceipt ? saveReceiptEdit : addReceipt}
               onCancel={() => { setShowReceiptForm(false); setReceiptFormCategoryLock(undefined); setEditingReceipt(null); }}
             />
+          </div>
+        </div>
+      )}
+
+      {showTripForm && !demoMode && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4" onClick={() => setShowTripForm(false)}>
+          <div className="w-full sm:max-w-md" onClick={(e) => e.stopPropagation()}>
+            <TripForm onSave={addTrip} onCancel={() => setShowTripForm(false)} />
           </div>
         </div>
       )}
