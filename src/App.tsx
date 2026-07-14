@@ -480,9 +480,18 @@ function AssistantButton({ onClick, disabled }: { onClick: () => void; disabled?
 const ASSISTANT_QUICK_REPLY_RE = /business or personal|business\/personal/i;
 const SpeechRecognitionCtor: any = typeof window !== "undefined" ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition) : undefined;
 
+const VOICE_ERROR_MESSAGES: Record<string, string> = {
+  "not-allowed": "Microphone access was blocked — check your browser's site settings and allow the microphone.",
+  "service-not-allowed": "Voice input isn't available on this browser.",
+  "audio-capture": "No microphone found on this device.",
+  "no-speech": "Didn't hear anything — try again.",
+  "network": "Voice input needs an internet connection.",
+};
+
 function AssistantModal({ messages, loading, onSend, onClose, disabled }: { messages: AssistantMessage[]; loading: boolean; onSend: (text: string) => void; onClose: () => void; disabled?: boolean }) {
   const [input, setInput] = useState("");
   const [listening, setListening] = useState(false);
+  const [voiceError, setVoiceError] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const transcriptRef = useRef("");
@@ -499,11 +508,14 @@ function AssistantModal({ messages, loading, onSend, onClose, disabled }: { mess
 
   const startListening = () => {
     if (!SpeechRecognitionCtor || loading || disabled || listening) return;
+    setVoiceError("");
     const recognition = new SpeechRecognitionCtor();
     recognition.lang = "en-AU";
     recognition.continuous = false;
     recognition.interimResults = true;
     transcriptRef.current = "";
+    let started = false;
+    recognition.onstart = () => { started = true; };
     recognition.onresult = (e: any) => {
       let transcript = "";
       for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
@@ -514,10 +526,27 @@ function AssistantModal({ messages, loading, onSend, onClose, disabled }: { mess
       setListening(false);
       const finalText = transcriptRef.current.trim();
       if (finalText) send(finalText);
+      else if (started) setVoiceError("Didn't catch that — try again.");
     };
-    recognition.onerror = () => setListening(false);
+    recognition.onerror = (e: any) => {
+      setListening(false);
+      setVoiceError(VOICE_ERROR_MESSAGES[e?.error] || "Voice input isn't working on this browser right now — try typing instead.");
+    };
     recognitionRef.current = recognition;
-    try { recognition.start(); setListening(true); } catch { setListening(false); }
+    try {
+      recognition.start();
+      setListening(true);
+      window.setTimeout(() => {
+        if (!started) {
+          try { recognition.stop(); } catch { /* already stopped */ }
+          setListening(false);
+          setVoiceError("Voice input isn't supported on this browser — try typing instead.");
+        }
+      }, 3000);
+    } catch {
+      setListening(false);
+      setVoiceError("Voice input isn't supported on this browser — try typing instead.");
+    }
   };
 
   const stopListening = () => recognitionRef.current?.stop();
@@ -574,6 +603,13 @@ function AssistantModal({ messages, loading, onSend, onClose, disabled }: { mess
           </div>
         )}
       </div>
+
+      {voiceError && (
+        <div className="flex items-center justify-between gap-2 px-4 py-2 text-xs flex-shrink-0" style={{ backgroundColor: AMBER_TINT, color: "#8A5A0F" }}>
+          <span>{voiceError}</span>
+          <button onClick={() => setVoiceError("")} className="flex-shrink-0"><X size={12} /></button>
+        </div>
+      )}
 
       <div className="flex items-center gap-2 px-4 py-3 border-t flex-shrink-0" style={{ borderColor: GREY_LINE }}>
         {SpeechRecognitionCtor && (
