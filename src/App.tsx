@@ -66,6 +66,7 @@ const todayISO = (): string => new Date().toISOString().slice(0, 10);
 const RECEIPT_SCANNER_URL = import.meta.env.VITE_RECEIPT_SCANNER_URL;
 const ASSISTANT_URL = RECEIPT_SCANNER_URL ? `${RECEIPT_SCANNER_URL.replace(/\/$/, "")}/assistant` : undefined;
 const TRANSCRIBE_URL = RECEIPT_SCANNER_URL ? `${RECEIPT_SCANNER_URL.replace(/\/$/, "")}/transcribe` : undefined;
+const DISTANCE_URL = RECEIPT_SCANNER_URL ? `${RECEIPT_SCANNER_URL.replace(/\/$/, "")}/distance` : undefined;
 const VOICE_SUPPORTED = typeof window !== "undefined" && typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== "undefined";
 
 interface AssistantMessage { role: "user" | "assistant"; content: any[] }
@@ -890,7 +891,7 @@ export default function App() {
     logbookDays: Math.min(daysElapsed, 84),
   });
 
-  const executeAssistantTool = (name: string, input: any): string => {
+  const executeAssistantTool = async (name: string, input: any): Promise<string> => {
     if (demoMode) return "Can't make changes in demo mode.";
     switch (name) {
       case "log_trip": {
@@ -921,6 +922,20 @@ export default function App() {
         saveReceiptEdit(updated);
         return "Updated.";
       }
+      case "calculate_distance": {
+        if (!DISTANCE_URL) return JSON.stringify({ error: "Distance lookup isn't configured." });
+        try {
+          const res = await fetch(DISTANCE_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ origin: input.origin, destination: input.destination }),
+          });
+          if (!res.ok) return JSON.stringify({ error: "Distance lookup failed." });
+          return JSON.stringify(await res.json());
+        } catch {
+          return JSON.stringify({ error: "Distance lookup failed — check your connection." });
+        }
+      }
       default:
         return "Unknown action.";
     }
@@ -946,7 +961,7 @@ export default function App() {
         const toolUses = content.filter((b: any) => b.type === "tool_use");
         if (toolUses.length === 0) break;
 
-        const toolResults = toolUses.map((tu: any) => ({ type: "tool_result", tool_use_id: tu.id, content: executeAssistantTool(tu.name, tu.input) }));
+        const toolResults = await Promise.all(toolUses.map(async (tu: any) => ({ type: "tool_result", tool_use_id: tu.id, content: await executeAssistantTool(tu.name, tu.input) })));
         current = [...current, { role: "user", content: toolResults }];
         setAssistantMessages(current);
       }

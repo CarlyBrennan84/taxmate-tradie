@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 
 export interface Env {
   ANTHROPIC_API_KEY: string;
+  GOOGLE_MAPS_API_KEY: string;
   AI: Ai;
 }
 
@@ -35,7 +36,7 @@ const RECEIPT_SCHEMA = {
 const ASSISTANT_TOOLS: Anthropic.Tool[] = [
   {
     name: "log_trip",
-    description: "Log a vehicle trip (business or personal) to the user's logbook.",
+    description: "Log a vehicle trip (business or personal) to the user's logbook. If the user gave you addresses/place names instead of a distance, call calculate_distance first and use that result for km.",
     input_schema: {
       type: "object",
       properties: {
@@ -44,6 +45,18 @@ const ASSISTANT_TOOLS: Anthropic.Tool[] = [
         purpose: { type: "string", description: "Short description, e.g. 'Site visit — Ballarat'" },
       },
       required: ["km", "type"],
+    },
+  },
+  {
+    name: "calculate_distance",
+    description: "Calculate the real driving distance in km between two addresses or place names. Use this whenever the user mentions a trip by location (e.g. 'from home to Bunnings Preston') instead of stating a distance directly.",
+    input_schema: {
+      type: "object",
+      properties: {
+        origin: { type: "string", description: "Starting address or place name" },
+        destination: { type: "string", description: "Ending address or place name" },
+      },
+      required: ["origin", "destination"],
     },
   },
   {
@@ -99,7 +112,7 @@ function assistantSystemPrompt(ctx: AssistantContext): string {
 
 Current snapshot for this user: occupation "${ctx.occupation || "unknown"}", income $${ctx.income ?? 0}, total deductions logged $${ctx.totalDeductions ?? 0}, estimated refund $${ctx.estimatedRefund ?? 0}, ${ctx.receiptsCount ?? 0} receipts logged, ${ctx.tripsCount ?? 0} trips logged, logbook day ${ctx.logbookDays ?? 0} of 84.
 
-You can log trips and expenses the user tells you about, and look up/update existing receipts (e.g. mark one as reimbursed by an employer, which is no longer claimable). Keep answers short and practical — this is a mobile chat, not an essay. For deduction questions, give a direct answer with a one-line reason, based on general ATO rules for Australian tradies/apprentices. Make clear this is general guidance, not registered tax advice, whenever the question is genuinely uncertain or high-stakes.`;
+You can log trips and expenses the user tells you about, look up/update existing receipts (e.g. mark one as reimbursed by an employer, which is no longer claimable), and calculate real driving distance between two addresses to log a trip when the user names locations instead of a km figure. Keep answers short and practical — this is a mobile chat, not an essay. For deduction questions, give a direct answer with a one-line reason, based on general ATO rules for Australian tradies/apprentices. Make clear this is general guidance, not registered tax advice, whenever the question is genuinely uncertain or high-stakes.`;
 }
 
 function corsHeaders(origin: string | null): Record<string, string> {
@@ -204,6 +217,51 @@ async function handleTranscribe(request: Request, env: Env, origin: string | nul
   }
 }
 
+async function handleDistance(request: Request, env: Env, origin: string | null): Promise<Response> {
+  let body: { origin?: string; destination?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON body" }, 400, origin);
+  }
+
+  const originAddr = (body.origin || "").trim();
+  const destinationAddr = (body.destination || "").trim();
+  if (!originAddr || !destinationAddr) {
+    return json({ error: "Missing origin or destination" }, 400, origin);
+  }
+
+  try {
+    const url = new URL("https://maps.googleapis.com/maps/api/distancematrix/json");
+    url.searchParams.set("origins", originAddr);
+    url.searchParams.set("destinations", destinationAddr);
+    url.searchParams.set("units", "metric");
+    url.searchParams.set("key", env.GOOGLE_MAPS_API_KEY);
+
+    const res = await fetch(url.toString());
+    const data: any = await res.json();
+    const element = data?.rows?.[0]?.elements?.[0];
+
+    if (data.status !== "OK" || !element || element.status !== "OK") {
+      return json({ error: "Couldn't find a route between those addresses — try being more specific." }, 200, origin);
+    }
+
+    return json(
+      {
+        distanceKm: Math.round((element.distance.value / 1000) * 10) / 10,
+        durationText: element.duration?.text || "",
+        originAddress: data.origin_addresses?.[0] || originAddr,
+        destinationAddress: data.destination_addresses?.[0] || destinationAddr,
+      },
+      200,
+      origin
+    );
+  } catch (err) {
+    console.error("Distance lookup failed", err);
+    return json({ error: "Failed to calculate distance" }, 502, origin);
+  }
+}
+
 async function handleAssistant(request: Request, env: Env, origin: string | null): Promise<Response> {
   let body: { messages?: Anthropic.MessageParam[]; context?: AssistantContext };
   try {
@@ -257,6 +315,9 @@ export default {
     }
     if (pathname === "/transcribe") {
       return handleTranscribe(request, env, origin);
+    }
+    if (pathname === "/distance") {
+      return handleDistance(request, env, origin);
     }
     return handleScanReceipt(request, env, origin);
   },
