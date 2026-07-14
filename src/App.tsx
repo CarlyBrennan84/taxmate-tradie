@@ -371,39 +371,6 @@ function Disclosure({ title, defaultOpen = false, children }: { title: string; d
   );
 }
 
-/* ---------------------------------------------------------------
-   Guided-assistant building blocks
-----------------------------------------------------------------*/
-interface SetupStep { key: string; label: string; done: boolean; onGo: () => void; }
-
-function TodayCard({ steps }: { steps: SetupStep[] }) {
-  const allDone = steps.every((s) => s.done);
-  if (allDone) {
-    return (
-      <Card className="p-4 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL_TINT }}>
-          <CheckCircle2 size={16} color={TEAL_DARK} />
-        </div>
-        <div className="text-sm font-semibold" style={{ color: NAVY }}>You're all caught up</div>
-      </Card>
-    );
-  }
-  return (
-    <Card className="p-5">
-      <span className="text-sm font-semibold" style={{ color: NAVY }}>Today</span>
-      <div className="mt-2">
-        {steps.map((s) => (
-          <button key={s.key} onClick={s.onGo} disabled={s.done} className="w-full flex items-center gap-3 py-2 text-left transition disabled:cursor-default">
-            <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0" style={s.done ? { backgroundColor: TEAL } : { border: "1.5px solid #D7DBE3" }}>
-              {s.done && <Check size={12} color="#fff" strokeWidth={3} />}
-            </div>
-            <span className="text-sm flex-1" style={s.done ? { color: "#B7BEC9", textDecoration: "line-through" } : { color: NAVY, fontWeight: 500 }}>{s.label}</span>
-          </button>
-        ))}
-      </div>
-    </Card>
-  );
-}
 
 function QuickSetupCard({ occupation, income, onSave, disabled }: { occupation: string; income: number; onSave: (occupation: string, income: number) => void; disabled?: boolean }) {
   const [draftOccupation, setDraftOccupation] = useState(occupation);
@@ -1012,14 +979,6 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  const setupSteps: SetupStep[] = [
-    { key: "vehicle", label: "Vehicle added", done: !!(activeData.profile.vehicle.make && activeData.profile.vehicle.rego), onGo: () => setTab("vehicle") },
-    { key: "odometer", label: "Opening odometer entered", done: (Number(activeData.profile.vehicle.openingOdometer) || 0) > 0, onGo: () => setTab("vehicle") },
-    { key: "receipt", label: missingDetailsCount > 0 ? `${missingDetailsCount} receipt${missingDetailsCount === 1 ? "" : "s"} need${missingDetailsCount === 1 ? "s" : ""} details` : "Upload your first receipt", done: receiptsWithNum.length > 0 && missingDetailsCount === 0, onGo: () => setTab("progress") },
-    { key: "logbook", label: trips.length > 0 ? `Continue logbook — ${Math.min(daysElapsed, 84)}/84 days` : "Start your logbook", done: logbookReady, onGo: () => setTab("vehicle") },
-    { key: "income", label: "Add tax withheld", done: withheld > 0, onGo: () => setTab("expenses") },
-  ];
-
   const NAV: { key: TabKey; label: string; icon: React.ElementType }[] = [
     { key: "overview", label: "Home", icon: LayoutDashboard },
     { key: "vehicle", label: "Logbook", icon: Car },
@@ -1143,8 +1102,6 @@ export default function App() {
                 <ShieldCheck size={16} color={TEAL_DARK} />
                 View Progress
               </button>
-
-              <TodayCard steps={setupSteps} />
 
               {todaySuggestion && (
                 <Card className="p-4 flex items-center gap-3">
