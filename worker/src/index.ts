@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 
 export interface Env {
   ANTHROPIC_API_KEY: string;
+  AI: Ai;
 }
 
 // Origins allowed to call this Worker. Add your local dev port and your
@@ -12,6 +13,7 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 
 const MAX_BASE64_LENGTH = 12_000_000; // ~9MB raw image, after client-side resize
+const MAX_AUDIO_BASE64_LENGTH = 15_000_000; // ~11MB raw audio, comfortably covers a 20s clip
 
 const RECEIPT_SCHEMA = {
   type: "object",
@@ -173,6 +175,35 @@ async function handleScanReceipt(request: Request, env: Env, origin: string | nu
   }
 }
 
+async function handleTranscribe(request: Request, env: Env, origin: string | null): Promise<Response> {
+  let body: { audio?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON body" }, 400, origin);
+  }
+
+  const { audio } = body;
+  if (!audio) {
+    return json({ error: "Missing audio" }, 400, origin);
+  }
+  if (audio.length > MAX_AUDIO_BASE64_LENGTH) {
+    return json({ error: "Recording too long" }, 413, origin);
+  }
+
+  try {
+    const binary = atob(audio);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+    const result = await env.AI.run("@cf/openai/whisper", { audio: Array.from(bytes) });
+    return json({ text: (result as { text?: string }).text || "" }, 200, origin);
+  } catch (err) {
+    console.error("Transcription failed", err);
+    return json({ error: "Failed to transcribe audio" }, 502, origin);
+  }
+}
+
 async function handleAssistant(request: Request, env: Env, origin: string | null): Promise<Response> {
   let body: { messages?: Anthropic.MessageParam[]; context?: AssistantContext };
   try {
@@ -223,6 +254,9 @@ export default {
     const { pathname } = new URL(request.url);
     if (pathname === "/assistant") {
       return handleAssistant(request, env, origin);
+    }
+    if (pathname === "/transcribe") {
+      return handleTranscribe(request, env, origin);
     }
     return handleScanReceipt(request, env, origin);
   },

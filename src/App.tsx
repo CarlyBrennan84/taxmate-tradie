@@ -65,6 +65,8 @@ const todayISO = (): string => new Date().toISOString().slice(0, 10);
 
 const RECEIPT_SCANNER_URL = import.meta.env.VITE_RECEIPT_SCANNER_URL;
 const ASSISTANT_URL = RECEIPT_SCANNER_URL ? `${RECEIPT_SCANNER_URL.replace(/\/$/, "")}/assistant` : undefined;
+const TRANSCRIBE_URL = RECEIPT_SCANNER_URL ? `${RECEIPT_SCANNER_URL.replace(/\/$/, "")}/transcribe` : undefined;
+const VOICE_SUPPORTED = typeof window !== "undefined" && typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== "undefined";
 
 interface AssistantMessage { role: "user" | "assistant"; content: any[] }
 
@@ -478,26 +480,32 @@ function AssistantButton({ onClick, disabled }: { onClick: () => void; disabled?
 }
 
 const ASSISTANT_QUICK_REPLY_RE = /business or personal|business\/personal/i;
-const SpeechRecognitionCtor: any = typeof window !== "undefined" ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition) : undefined;
+const MAX_RECORDING_MS = 20000;
 
-const VOICE_ERROR_MESSAGES: Record<string, string> = {
-  "not-allowed": "Microphone access was blocked — check your browser's site settings and allow the microphone.",
-  "service-not-allowed": "Voice input isn't available on this browser.",
-  "audio-capture": "No microphone found on this device.",
-  "no-speech": "Didn't hear anything — try again.",
-  "network": "Voice input needs an internet connection.",
-};
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve((reader.result as string).split(",")[1] || "");
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
 
 function AssistantModal({ messages, loading, onSend, onClose, disabled }: { messages: AssistantMessage[]; loading: boolean; onSend: (text: string) => void; onClose: () => void; disabled?: boolean }) {
   const [input, setInput] = useState("");
-  const [listening, setListening] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const [voiceError, setVoiceError] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
-  const recognitionRef = useRef<any>(null);
-  const transcriptRef = useRef("");
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const maxDurationTimerRef = useRef<number | null>(null);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, loading]);
-  useEffect(() => () => recognitionRef.current?.stop(), []);
+  useEffect(() => () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") mediaRecorderRef.current.stop();
+    if (maxDurationTimerRef.current) window.clearTimeout(maxDurationTimerRef.current);
+  }, []);
 
   const send = (text: string) => {
     const trimmed = text.trim();
@@ -506,50 +514,58 @@ function AssistantModal({ messages, loading, onSend, onClose, disabled }: { mess
     setInput("");
   };
 
-  const startListening = () => {
-    if (!SpeechRecognitionCtor || loading || disabled || listening) return;
+  const startRecording = async () => {
+    if (!VOICE_SUPPORTED || !TRANSCRIBE_URL || loading || disabled || recording || transcribing) return;
     setVoiceError("");
-    const recognition = new SpeechRecognitionCtor();
-    recognition.lang = "en-AU";
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    transcriptRef.current = "";
-    let started = false;
-    recognition.onstart = () => { started = true; };
-    recognition.onresult = (e: any) => {
-      let transcript = "";
-      for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
-      transcriptRef.current = transcript;
-      setInput(transcript);
-    };
-    recognition.onend = () => {
-      setListening(false);
-      const finalText = transcriptRef.current.trim();
-      if (finalText) send(finalText);
-      else if (started) setVoiceError("Didn't catch that — try again.");
-    };
-    recognition.onerror = (e: any) => {
-      setListening(false);
-      setVoiceError(VOICE_ERROR_MESSAGES[e?.error] || "Voice input isn't working on this browser right now — try typing instead.");
-    };
-    recognitionRef.current = recognition;
     try {
-      recognition.start();
-      setListening(true);
-      window.setTimeout(() => {
-        if (!started) {
-          try { recognition.stop(); } catch { /* already stopped */ }
-          setListening(false);
-          setVoiceError("Voice input isn't supported on this browser — try typing instead.");
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      chunksRef.current = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        if (maxDurationTimerRef.current) { window.clearTimeout(maxDurationTimerRef.current); maxDurationTimerRef.current = null; }
+        setRecording(false);
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        if (blob.size < 1000) return; // too short to be real speech
+        setTranscribing(true);
+        try {
+          const base64 = await blobToBase64(blob);
+          const res = await fetch(TRANSCRIBE_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ audio: base64 }),
+          });
+          if (!res.ok) throw new Error("transcribe failed");
+          const data = await res.json();
+          const text = (data.text || "").trim();
+          if (text) send(text);
+          else setVoiceError("Didn't catch that — try again.");
+        } catch {
+          setVoiceError("Couldn't transcribe that — check your connection and try again.");
+        } finally {
+          setTranscribing(false);
         }
-      }, 3000);
-    } catch {
-      setListening(false);
-      setVoiceError("Voice input isn't supported on this browser — try typing instead.");
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setRecording(true);
+      maxDurationTimerRef.current = window.setTimeout(() => stopRecording(), MAX_RECORDING_MS);
+    } catch (err: any) {
+      setRecording(false);
+      if (err?.name === "NotAllowedError" || err?.name === "SecurityError") {
+        setVoiceError("Microphone access was blocked — check your browser's site settings and allow the microphone.");
+      } else if (err?.name === "NotFoundError") {
+        setVoiceError("No microphone found on this device.");
+      } else {
+        setVoiceError("Couldn't access the microphone on this browser.");
+      }
     }
   };
 
-  const stopListening = () => recognitionRef.current?.stop();
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") mediaRecorderRef.current.stop();
+  };
 
   const lastAssistantText = (() => {
     const last = messages[messages.length - 1];
@@ -571,7 +587,7 @@ function AssistantModal({ messages, loading, onSend, onClose, disabled }: { mess
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {messages.length === 0 && (
           <div className="rounded-2xl px-4 py-3 max-w-[85%]" style={{ backgroundColor: "#FBFBFC" }}>
-            <p className="text-sm leading-relaxed" style={{ color: NAVY }}>Hi! I'm your TaxMate AI. Ask me anything about your tax, deductions or claims — or tell me about a trip or expense and I'll log it for you.{SpeechRecognitionCtor ? " Tap the mic to just talk — handy when your hands are full." : ""}</p>
+            <p className="text-sm leading-relaxed" style={{ color: NAVY }}>Hi! I'm your TaxMate AI. Ask me anything about your tax, deductions or claims — or tell me about a trip or expense and I'll log it for you.{VOICE_SUPPORTED && TRANSCRIBE_URL ? " Tap the mic to just talk — handy when your hands are full." : ""}</p>
           </div>
         )}
         {messages.map((m, i) => {
@@ -612,13 +628,13 @@ function AssistantModal({ messages, loading, onSend, onClose, disabled }: { mess
       )}
 
       <div className="flex items-center gap-2 px-4 py-3 border-t flex-shrink-0" style={{ borderColor: GREY_LINE }}>
-        {SpeechRecognitionCtor && (
+        {VOICE_SUPPORTED && TRANSCRIBE_URL && (
           <button
-            onClick={() => (listening ? stopListening() : startListening())}
-            disabled={disabled || loading}
-            aria-label={listening ? "Stop recording" : "Speak"}
-            className={`p-3 rounded-xl transition disabled:opacity-50 flex-shrink-0 ${listening ? "animate-pulse" : ""}`}
-            style={listening ? { backgroundColor: "#C4573F", color: "#fff" } : { backgroundColor: TEAL_TINT, color: TEAL_DARK }}
+            onClick={() => (recording ? stopRecording() : startRecording())}
+            disabled={disabled || loading || transcribing}
+            aria-label={recording ? "Stop recording" : "Speak"}
+            className={`p-3 rounded-xl transition disabled:opacity-50 flex-shrink-0 ${recording ? "animate-pulse" : ""}`}
+            style={recording ? { backgroundColor: "#C4573F", color: "#fff" } : { backgroundColor: TEAL_TINT, color: TEAL_DARK }}
           >
             <Mic size={17} />
           </button>
@@ -627,8 +643,8 @@ function AssistantModal({ messages, loading, onSend, onClose, disabled }: { mess
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") send(input); }}
-          placeholder={disabled ? "Not available in demo mode" : listening ? "Listening…" : "Ask me anything…"}
-          disabled={disabled || loading}
+          placeholder={disabled ? "Not available in demo mode" : recording ? "Listening…" : transcribing ? "Transcribing…" : "Ask me anything…"}
+          disabled={disabled || loading || recording || transcribing}
           className={inputCls}
         />
         <button onClick={() => send(input)} disabled={disabled || loading || !input.trim()} className="p-3 rounded-xl text-white transition disabled:opacity-50 flex-shrink-0" style={{ backgroundColor: TEAL }}>
