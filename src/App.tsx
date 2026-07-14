@@ -4,7 +4,7 @@ import {
   GraduationCap, FileText, Plus, Trash2, ChevronRight, Menu,
   Download, Printer, TrendingUp, Gauge, MapPin, Sparkles, Camera,
   Check, CheckCircle2, AlertTriangle, Fuel, Upload, ShieldCheck, X,
-  Search, SlidersHorizontal, Send,
+  Search, SlidersHorizontal, Send, Mic,
 } from "lucide-react";
 import type { AppData, Receipt as ReceiptT, Trip, CategoryKey } from "./types";
 import { loadData, saveData, loadDemoFlag, saveDemoFlag } from "./lib/storage";
@@ -511,12 +511,17 @@ function AssistantButton({ onClick, disabled }: { onClick: () => void; disabled?
 }
 
 const ASSISTANT_QUICK_REPLY_RE = /business or personal|business\/personal/i;
+const SpeechRecognitionCtor: any = typeof window !== "undefined" ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition) : undefined;
 
 function AssistantModal({ messages, loading, onSend, onClose, disabled }: { messages: AssistantMessage[]; loading: boolean; onSend: (text: string) => void; onClose: () => void; disabled?: boolean }) {
   const [input, setInput] = useState("");
+  const [listening, setListening] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const transcriptRef = useRef("");
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, loading]);
+  useEffect(() => () => recognitionRef.current?.stop(), []);
 
   const send = (text: string) => {
     const trimmed = text.trim();
@@ -524,6 +529,31 @@ function AssistantModal({ messages, loading, onSend, onClose, disabled }: { mess
     onSend(trimmed);
     setInput("");
   };
+
+  const startListening = () => {
+    if (!SpeechRecognitionCtor || loading || disabled || listening) return;
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = "en-AU";
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    transcriptRef.current = "";
+    recognition.onresult = (e: any) => {
+      let transcript = "";
+      for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
+      transcriptRef.current = transcript;
+      setInput(transcript);
+    };
+    recognition.onend = () => {
+      setListening(false);
+      const finalText = transcriptRef.current.trim();
+      if (finalText) send(finalText);
+    };
+    recognition.onerror = () => setListening(false);
+    recognitionRef.current = recognition;
+    try { recognition.start(); setListening(true); } catch { setListening(false); }
+  };
+
+  const stopListening = () => recognitionRef.current?.stop();
 
   const lastAssistantText = (() => {
     const last = messages[messages.length - 1];
@@ -545,7 +575,7 @@ function AssistantModal({ messages, loading, onSend, onClose, disabled }: { mess
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {messages.length === 0 && (
           <div className="rounded-2xl px-4 py-3 max-w-[85%]" style={{ backgroundColor: "#FBFBFC" }}>
-            <p className="text-sm leading-relaxed" style={{ color: NAVY }}>Hi! I'm your TaxMate AI. Ask me anything about your tax, deductions or claims — or tell me about a trip or expense and I'll log it for you.</p>
+            <p className="text-sm leading-relaxed" style={{ color: NAVY }}>Hi! I'm your TaxMate AI. Ask me anything about your tax, deductions or claims — or tell me about a trip or expense and I'll log it for you.{SpeechRecognitionCtor ? " Tap the mic to just talk — handy when your hands are full." : ""}</p>
           </div>
         )}
         {messages.map((m, i) => {
@@ -579,11 +609,22 @@ function AssistantModal({ messages, loading, onSend, onClose, disabled }: { mess
       </div>
 
       <div className="flex items-center gap-2 px-4 py-3 border-t flex-shrink-0" style={{ borderColor: GREY_LINE }}>
+        {SpeechRecognitionCtor && (
+          <button
+            onClick={() => (listening ? stopListening() : startListening())}
+            disabled={disabled || loading}
+            aria-label={listening ? "Stop recording" : "Speak"}
+            className={`p-3 rounded-xl transition disabled:opacity-50 flex-shrink-0 ${listening ? "animate-pulse" : ""}`}
+            style={listening ? { backgroundColor: "#C4573F", color: "#fff" } : { backgroundColor: TEAL_TINT, color: TEAL_DARK }}
+          >
+            <Mic size={17} />
+          </button>
+        )}
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") send(input); }}
-          placeholder={disabled ? "Not available in demo mode" : "Ask me anything…"}
+          placeholder={disabled ? "Not available in demo mode" : listening ? "Listening…" : "Ask me anything…"}
           disabled={disabled || loading}
           className={inputCls}
         />
