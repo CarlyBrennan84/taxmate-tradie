@@ -9,9 +9,8 @@ import {
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import type { AppData, Receipt as ReceiptT, Trip, CategoryKey, Profile } from "./types";
-import { loadData, saveData, loadDemoFlag, saveDemoFlag } from "./lib/storage";
+import { loadData, saveData } from "./lib/storage";
 import { supabase, arrivedViaInviteOrRecovery } from "./lib/supabaseClient";
-import { SAMPLE_DATA } from "./sampleData";
 import { parseDriversnoteCSV } from "./csv";
 import BenefitsFeature from "./benefits/BenefitsFeature";
 
@@ -894,7 +893,6 @@ export default function App() {
   const [showTripForm, setShowTripForm] = useState(false);
   const [showLogbookInfo, setShowLogbookInfo] = useState(false);
   const [scanQueue, setScanQueue] = useState<ScanQueueItem[]>([]);
-  const [demoMode, setDemoMode] = useState<boolean>(() => loadDemoFlag());
   const [csvPreview, setCsvPreview] = useState<Trip[] | null>(null);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
@@ -917,11 +915,11 @@ export default function App() {
   }, [session?.user.id]);
 
   useEffect(() => {
-    if (!data || !session || demoMode) return;
+    if (!data || !session) return;
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => { saveData(data, session.user.id); }, 800);
     return () => { if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current); };
-  }, [data, demoMode, session]);
+  }, [data, session]);
 
   const handleLogout = async () => { if (supabase) await supabase.auth.signOut(); };
 
@@ -960,10 +958,9 @@ export default function App() {
     );
   }
 
-  const activeData: AppData = demoMode ? SAMPLE_DATA : data;
+  const activeData: AppData = data;
 
   const update = (fn: (d: AppData) => AppData) => {
-    if (demoMode) return;
     setData((prev) => (prev ? fn(structuredClone(prev)) : prev));
   };
 
@@ -994,7 +991,6 @@ export default function App() {
   };
 
   const handleFiles = (files: File[]) => {
-    if (demoMode) return;
     files.forEach((f) => {
       const id = uid();
       const isImage = f.type.startsWith("image/");
@@ -1014,7 +1010,6 @@ export default function App() {
   };
 
   const openManualExpenseEntry = () => {
-    if (demoMode) return;
     setReceiptFormCategoryLock(undefined);
     setShowReceiptForm(true);
     setReceiptCategoryFilter("all");
@@ -1022,25 +1017,21 @@ export default function App() {
   };
 
   const saveQuickSetup = (occupation: string, income: number) => {
-    if (demoMode) return;
     update((d) => { d.profile.occupation = occupation; d.profile.income = income; d.profile.quickSetupDone = true; return d; });
   };
 
   const quickUploadReceipt = () => {
-    if (demoMode) return;
     setReceiptCategoryFilter("all");
     setTab("progress");
     receiptInputRef.current?.click();
   };
 
   const quickLogTravel = () => {
-    if (demoMode) return;
     setTab("vehicle");
     setShowTripForm(true);
   };
 
   const handleCSVFile = (file: File) => {
-    if (demoMode) return;
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = (e.target?.result as string) || "";
@@ -1055,9 +1046,6 @@ export default function App() {
     update((d) => { d.trips = [...csvPreview, ...d.trips]; return d; });
     setCsvPreview(null);
   };
-
-  const enableDemo = () => { setDemoMode(true); saveDemoFlag(true); };
-  const disableDemo = () => { setDemoMode(false); saveDemoFlag(false); };
 
   /* ---------------- derived numbers (based on activeData) ---------------- */
   const receiptsWithNum = activeData.receipts.map((r) => ({ ...r, amount: Number(r.amount) || 0, workPct: Number(r.workPct) || 0 }));
@@ -1102,7 +1090,6 @@ export default function App() {
   });
 
   const executeAssistantTool = async (name: string, input: any): Promise<string> => {
-    if (demoMode) return "Can't make changes in demo mode.";
     switch (name) {
       case "log_trip": {
         const t: Trip = { id: uid(), date: todayISO(), purpose: input.purpose || "", type: input.type === "personal" ? "personal" : "business", km: Number(input.km) || 0 };
@@ -1400,9 +1387,6 @@ export default function App() {
             <button onClick={() => setTab("settings")} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all" style={tab === "settings" ? { backgroundColor: TEAL_TINT, color: TEAL_DARK } : { color: "#5B6472" }}>
               <SettingsIcon size={17} />Settings{tab === "settings" && <ChevronRight size={14} className="ml-auto" />}
             </button>
-            <button onClick={demoMode ? disableDemo : enableDemo} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold border transition" style={demoMode ? { backgroundColor: AMBER_TINT, borderColor: AMBER_TINT, color: "#8A5A0F" } : { borderColor: GREY_LINE, color: NAVY_SOFT }}>
-              {demoMode ? <><X size={13} /> Clear demo data</> : <><Sparkles size={13} /> View sample apprentice data</>}
-            </button>
             <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold border transition" style={{ borderColor: GREY_LINE, color: NAVY_SOFT }}>
               <LogOut size={13} /> Log out
             </button>
@@ -1427,10 +1411,7 @@ export default function App() {
             <button onClick={() => { setTab("settings"); setMobileNav(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium" style={tab === "settings" ? { backgroundColor: TEAL_TINT, color: TEAL_DARK } : { color: "#5B6472" }}>
               <SettingsIcon size={17} />Settings
             </button>
-            <div className="pt-2 mt-1 space-y-2" style={{ borderTop: "1px solid " + GREY_LINE }}>
-              <button onClick={() => { demoMode ? disableDemo() : enableDemo(); setMobileNav(false); }} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold border" style={demoMode ? { backgroundColor: AMBER_TINT, borderColor: AMBER_TINT, color: "#8A5A0F" } : { borderColor: GREY_LINE, color: NAVY_SOFT }}>
-                {demoMode ? <><X size={13} /> Clear demo data</> : <><Sparkles size={13} /> View sample apprentice data</>}
-              </button>
+            <div className="pt-2 mt-1" style={{ borderTop: "1px solid " + GREY_LINE }}>
               <button onClick={() => { handleLogout(); setMobileNav(false); }} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold border" style={{ borderColor: GREY_LINE, color: NAVY_SOFT }}>
                 <LogOut size={13} /> Log out
               </button>
@@ -1439,12 +1420,6 @@ export default function App() {
         )}
 
         <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-10 py-6 lg:py-8 pt-[68px] lg:pt-8 pb-36 lg:pb-24 max-w-6xl mx-auto w-full">
-          {demoMode && (
-            <div className="mb-5 flex items-center justify-between gap-3 px-4 py-3 rounded-2xl fade-up" style={{ backgroundColor: TEAL_TINT }}>
-              <div className="flex items-center gap-2 text-sm font-medium" style={{ color: TEAL_DARK }}><Sparkles size={15} />Viewing sample apprentice data — nothing here is saved</div>
-              <button onClick={disableDemo} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white hover:brightness-95 transition flex-shrink-0" style={{ color: TEAL_DARK }}>Clear demo data</button>
-            </div>
-          )}
 
           {tab === "overview" && (
             <div className="space-y-6">
@@ -1456,15 +1431,15 @@ export default function App() {
               <div>
                 <div className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Quick actions</div>
                 <div className="grid grid-cols-3 gap-3">
-                  <button onClick={quickUploadReceipt} disabled={demoMode} className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-white border shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ borderColor: GREY_LINE }}>
+                  <button onClick={quickUploadReceipt} className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-white border shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ borderColor: GREY_LINE }}>
                     <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: NAVY }}><Camera size={18} color="#fff" /></div>
                     <span className="text-xs font-semibold" style={{ color: NAVY }}>Scan Receipt</span>
                   </button>
-                  <button onClick={quickLogTravel} disabled={demoMode} className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-white border shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ borderColor: GREY_LINE }}>
+                  <button onClick={quickLogTravel} className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-white border shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ borderColor: GREY_LINE }}>
                     <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: NAVY }}><Car size={18} color="#fff" /></div>
                     <span className="text-xs font-semibold" style={{ color: NAVY }}>Log Trip</span>
                   </button>
-                  <button onClick={() => setAssistantOpen(true)} disabled={demoMode || !ASSISTANT_URL} className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-white border shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ borderColor: GREY_LINE }}>
+                  <button onClick={() => setAssistantOpen(true)} disabled={!ASSISTANT_URL} className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-white border shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ borderColor: GREY_LINE }}>
                     <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: NAVY }}><Mic size={18} color="#fff" /></div>
                     <span className="text-xs font-semibold" style={{ color: NAVY }}>Ask TaxMate</span>
                   </button>
@@ -1476,7 +1451,7 @@ export default function App() {
                   occupation={activeData.profile.occupation}
                   income={activeData.profile.income}
                   onSave={saveQuickSetup}
-                  disabled={demoMode}
+                 
                 />
               ) : (
                 <div className="rounded-3xl p-6 fade-up" style={{ background: `linear-gradient(135deg, ${NAVY} 0%, ${TEAL_DARK} 100%)` }}>
@@ -1523,7 +1498,7 @@ export default function App() {
                   </div>
                   <div className="divide-y" style={{ borderColor: GREY_LINE }}>
                     {todaysTasks.map((t) => (
-                      <button key={t.key} onClick={t.onGo} disabled={demoMode} className="w-full flex items-center gap-3 py-3 text-left disabled:opacity-50 disabled:cursor-not-allowed group">
+                      <button key={t.key} onClick={t.onGo} className="w-full flex items-center gap-3 py-3 text-left disabled:opacity-50 disabled:cursor-not-allowed group">
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL_TINT }}>
                           <t.icon size={16} color={TEAL_DARK} />
                         </div>
@@ -1551,7 +1526,7 @@ export default function App() {
                     <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#8A93A3" }}>TaxMate Insight</div>
                     <div className="text-sm font-medium mt-0.5" style={{ color: NAVY }}>{todaySuggestion.text}</div>
                   </div>
-                  <button onClick={todaySuggestion.action} disabled={demoMode} className="px-3.5 py-1.5 rounded-full text-xs font-semibold flex-shrink-0 disabled:opacity-50 transition hover:brightness-95" style={{ backgroundColor: TEAL_TINT, color: TEAL_DARK }}>
+                  <button onClick={todaySuggestion.action} className="px-3.5 py-1.5 rounded-full text-xs font-semibold flex-shrink-0 disabled:opacity-50 transition hover:brightness-95" style={{ backgroundColor: TEAL_TINT, color: TEAL_DARK }}>
                     Add now
                   </button>
                 </Card>
@@ -1695,7 +1670,7 @@ export default function App() {
                 <div className="text-center"><span className="text-xs font-semibold tabular" style={{ color: NAVY_SOFT }}>{currentOdometer > 0 ? Math.round(currentOdometer).toLocaleString() : "—"}</span> <span className="text-[11px]" style={{ color: "#8A93A3" }}>est. odometer</span></div>
               </div>
 
-              <button onClick={() => setShowTripForm(true)} disabled={demoMode} className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-white font-semibold shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ backgroundColor: TEAL }}>
+              <button onClick={() => setShowTripForm(true)} className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-white font-semibold shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ backgroundColor: TEAL }}>
                 <Car size={18} />
                 Log Trip
               </button>
@@ -1711,7 +1686,7 @@ export default function App() {
 
               <Disclosure title="Import from Driversnote">
                 <p className="text-xs mb-3" style={{ color: "#8A93A3" }}>Export a CSV from Driversnote and drop it in — TaxMate will match up dates, distances and trip purposes.</p>
-                <button onClick={() => csvInputRef.current?.click()} disabled={demoMode} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition disabled:opacity-50" style={{ borderColor: GREY_LINE, color: NAVY }}><Upload size={15} />Import Driversnote CSV</button>
+                <button onClick={() => csvInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition disabled:opacity-50" style={{ borderColor: GREY_LINE, color: NAVY }}><Upload size={15} />Import Driversnote CSV</button>
               </Disclosure>
 
               {csvPreview && (
@@ -1874,7 +1849,7 @@ export default function App() {
                     <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#8A93A3" }}>TaxMate Insight</div>
                     <div className="text-sm font-medium mt-0.5" style={{ color: NAVY }}>{todaySuggestion.text}</div>
                   </div>
-                  <button onClick={todaySuggestion.action} disabled={demoMode} className="px-3.5 py-1.5 rounded-full text-xs font-semibold flex-shrink-0 disabled:opacity-50 transition hover:brightness-95" style={{ backgroundColor: TEAL_TINT, color: TEAL_DARK }}>
+                  <button onClick={todaySuggestion.action} className="px-3.5 py-1.5 rounded-full text-xs font-semibold flex-shrink-0 disabled:opacity-50 transition hover:brightness-95" style={{ backgroundColor: TEAL_TINT, color: TEAL_DARK }}>
                     Add now
                   </button>
                 </Card>
@@ -1973,20 +1948,20 @@ export default function App() {
               <Card className="p-5">
                 <SectionTitle title="Profile & tax details" eyebrow="Used across your dashboard and accountant summary" />
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="Your name"><input disabled={demoMode} value={activeData.profile.name} onChange={(e) => setProfile("name", e.target.value)} placeholder="Optional" className={inputCls} /></Field>
-                  <Field label="Occupation"><input disabled={demoMode} value={activeData.profile.occupation} onChange={(e) => setProfile("occupation", e.target.value)} className={inputCls} /></Field>
-                  <Field label="Income ($)"><input disabled={demoMode} type="number" value={activeData.profile.income} onChange={(e) => setProfile("income", Number(e.target.value))} className={inputCls} /></Field>
-                  <Field label="Tax withheld ($)"><input disabled={demoMode} type="number" value={activeData.profile.taxWithheld} onChange={(e) => setProfile("taxWithheld", Number(e.target.value))} className={inputCls} /></Field>
+                  <Field label="Your name"><input value={activeData.profile.name} onChange={(e) => setProfile("name", e.target.value)} placeholder="Optional" className={inputCls} /></Field>
+                  <Field label="Occupation"><input value={activeData.profile.occupation} onChange={(e) => setProfile("occupation", e.target.value)} className={inputCls} /></Field>
+                  <Field label="Income ($)"><input type="number" value={activeData.profile.income} onChange={(e) => setProfile("income", Number(e.target.value))} className={inputCls} /></Field>
+                  <Field label="Tax withheld ($)"><input type="number" value={activeData.profile.taxWithheld} onChange={(e) => setProfile("taxWithheld", Number(e.target.value))} className={inputCls} /></Field>
                 </div>
               </Card>
 
               <Card className="p-5">
                 <SectionTitle title="Vehicle details" eyebrow="Used for your logbook and odometer tracking" />
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="Make"><input disabled={demoMode} value={activeData.profile.vehicle.make} onChange={(e) => setVehicle("make", e.target.value)} className={inputCls} placeholder="Toyota" /></Field>
-                  <Field label="Model"><input disabled={demoMode} value={activeData.profile.vehicle.model} onChange={(e) => setVehicle("model", e.target.value)} className={inputCls} placeholder="HiLux" /></Field>
-                  <Field label="Rego"><input disabled={demoMode} value={activeData.profile.vehicle.rego} onChange={(e) => setVehicle("rego", e.target.value)} className={inputCls} placeholder="1AB2CD" /></Field>
-                  <Field label="Opening odometer (km)"><input disabled={demoMode} type="number" value={activeData.profile.vehicle.openingOdometer} onChange={(e) => setVehicle("openingOdometer", Number(e.target.value))} className={inputCls} /></Field>
+                  <Field label="Make"><input value={activeData.profile.vehicle.make} onChange={(e) => setVehicle("make", e.target.value)} className={inputCls} placeholder="Toyota" /></Field>
+                  <Field label="Model"><input value={activeData.profile.vehicle.model} onChange={(e) => setVehicle("model", e.target.value)} className={inputCls} placeholder="HiLux" /></Field>
+                  <Field label="Rego"><input value={activeData.profile.vehicle.rego} onChange={(e) => setVehicle("rego", e.target.value)} className={inputCls} placeholder="1AB2CD" /></Field>
+                  <Field label="Opening odometer (km)"><input type="number" value={activeData.profile.vehicle.openingOdometer} onChange={(e) => setVehicle("openingOdometer", Number(e.target.value))} className={inputCls} /></Field>
                 </div>
               </Card>
 
@@ -1994,10 +1969,10 @@ export default function App() {
                 <SectionTitle title="Other common deductions" eyebrow="No receipts needed under ATO thresholds" />
                 <div className="grid grid-cols-2 gap-4">
                   <Field label={`Laundry & uniform estimate (up to $${LAUNDRY_ATO_CAP} without receipts)`}>
-                    <input disabled={demoMode} type="number" value={activeData.profile.laundryEstimate} onChange={(e) => setProfile("laundryEstimate", Number(e.target.value))} className={inputCls} />
+                    <input type="number" value={activeData.profile.laundryEstimate} onChange={(e) => setProfile("laundryEstimate", Number(e.target.value))} className={inputCls} />
                   </Field>
                   <Field label="Phone & internet work-use %">
-                    <input disabled={demoMode} type="number" min={0} max={100} value={activeData.profile.phoneWorkPct} onChange={(e) => setProfile("phoneWorkPct", Number(e.target.value))} className={inputCls} />
+                    <input type="number" min={0} max={100} value={activeData.profile.phoneWorkPct} onChange={(e) => setProfile("phoneWorkPct", Number(e.target.value))} className={inputCls} />
                   </Field>
                 </div>
                 <p className="text-xs mt-3 leading-relaxed" style={{ color: "#8A93A3" }}>The ATO allows a reasonable estimate for laundering work uniforms without keeping receipts, up to ${LAUNDRY_ATO_CAP} a year. Your phone % should reflect genuine work use — check a typical bill if you're not sure.</p>
@@ -2007,10 +1982,10 @@ export default function App() {
                 <SectionTitle title="AI travel memory" eyebrow="What TaxMate AI remembers when you log trips" />
                 <div className="grid grid-cols-2 gap-4">
                   <Field label="Home address">
-                    <input disabled={demoMode} value={activeData.profile.homeAddress || ""} onChange={(e) => updateTravelProfile({ homeAddress: e.target.value })} placeholder="e.g. 18 Maureen Close, Cranbourne West" className={inputCls} />
+                    <input value={activeData.profile.homeAddress || ""} onChange={(e) => updateTravelProfile({ homeAddress: e.target.value })} placeholder="e.g. 18 Maureen Close, Cranbourne West" className={inputCls} />
                   </Field>
                   <Field label="Usual trip type">
-                    <select disabled={demoMode} value={activeData.profile.assumeRoundTrip === false ? "one_way" : "round_trip"} onChange={(e) => updateTravelProfile({ assumeRoundTrip: e.target.value === "round_trip" })} className={inputCls}>
+                    <select value={activeData.profile.assumeRoundTrip === false ? "one_way" : "round_trip"} onChange={(e) => updateTravelProfile({ assumeRoundTrip: e.target.value === "round_trip" })} className={inputCls}>
                       <option value="round_trip">Round trip (there and back)</option>
                       <option value="one_way">One-way</option>
                     </select>
@@ -2022,9 +1997,6 @@ export default function App() {
               <Card className="p-5">
                 <SectionTitle title="Account" />
                 <div className="flex flex-wrap gap-2">
-                  <button onClick={demoMode ? disableDemo : enableDemo} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition" style={demoMode ? { backgroundColor: AMBER_TINT, borderColor: AMBER_TINT, color: "#8A5A0F" } : { borderColor: GREY_LINE, color: NAVY_SOFT }}>
-                    {demoMode ? <><X size={15} /> Clear demo data</> : <><Sparkles size={15} /> View sample apprentice data</>}
-                  </button>
                   <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition" style={{ borderColor: GREY_LINE, color: NAVY_SOFT }}>
                     <LogOut size={15} /> Log out
                   </button>
@@ -2046,7 +2018,7 @@ export default function App() {
         </button>
       </div>
 
-      {(showReceiptForm || editingReceipt) && !demoMode && (
+      {(showReceiptForm || editingReceipt) && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4" onClick={() => { setShowReceiptForm(false); setReceiptFormCategoryLock(undefined); setEditingReceipt(null); }}>
           <div className="w-full sm:max-w-lg" onClick={(e) => e.stopPropagation()}>
             <ReceiptForm
@@ -2059,7 +2031,7 @@ export default function App() {
         </div>
       )}
 
-      {scanQueue.length > 0 && !demoMode && (
+      {scanQueue.length > 0 && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
           <div className="w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl p-5 max-h-[92vh] overflow-y-auto">
             <ReceiptReviewModal
@@ -2071,7 +2043,7 @@ export default function App() {
         </div>
       )}
 
-      {showTripForm && !demoMode && (
+      {showTripForm && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4" onClick={() => setShowTripForm(false)}>
           <div className="w-full sm:max-w-md" onClick={(e) => e.stopPropagation()}>
             <TripForm onSave={addTrip} onCancel={() => setShowTripForm(false)} />
@@ -2085,10 +2057,10 @@ export default function App() {
             onScan={quickUploadReceipt}
             onLogTrip={quickLogTravel}
             onAddExpense={openManualExpenseEntry}
-            onImportCsv={() => { if (demoMode) return; csvInputRef.current?.click(); }}
-            disabled={demoMode}
+            onImportCsv={() => csvInputRef.current?.click()}
+           
           />
-          {ASSISTANT_URL && <AssistantButton onClick={() => setAssistantOpen(true)} disabled={demoMode} />}
+          {ASSISTANT_URL && <AssistantButton onClick={() => setAssistantOpen(true)} />}
         </>
       )}
 
@@ -2098,7 +2070,7 @@ export default function App() {
           loading={assistantLoading}
           onSend={sendAssistantMessage}
           onClose={() => setAssistantOpen(false)}
-          disabled={demoMode}
+         
         />
       )}
     </div>

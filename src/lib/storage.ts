@@ -76,19 +76,3 @@ export async function saveData(data: AppData, userId: string): Promise<void> {
     console.error("Failed to save TaxMate Tradie data", e);
   }
 }
-
-const DEMO_KEY = "taxmate-tradie-demo-mode";
-
-export function loadDemoFlag(): boolean {
-  try {
-    return window.localStorage.getItem(DEMO_KEY) === "1";
-  } catch (e) {
-    return false;
-  }
-}
-
-export function saveDemoFlag(on: boolean): void {
-  try {
-    window.localStorage.setItem(DEMO_KEY, on ? "1" : "0");
-  } catch (e) {}
-}
