@@ -1448,6 +1448,24 @@ export default function App() {
                 <p className="text-sm mt-1" style={{ color: "#8A93A3" }}>{estimatedRefund > 0 ? "You're on track to save" : `${activeData.profile.occupation} · ${activeData.profile.fy}`}</p>
               </div>
 
+              <div>
+                <div className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Quick actions</div>
+                <div className="grid grid-cols-3 gap-3">
+                  <button onClick={quickUploadReceipt} disabled={demoMode} className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-white border shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ borderColor: GREY_LINE }}>
+                    <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: NAVY }}><Camera size={18} color="#fff" /></div>
+                    <span className="text-xs font-semibold" style={{ color: NAVY }}>Scan Receipt</span>
+                  </button>
+                  <button onClick={quickLogTravel} disabled={demoMode} className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-white border shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ borderColor: GREY_LINE }}>
+                    <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: NAVY }}><Car size={18} color="#fff" /></div>
+                    <span className="text-xs font-semibold" style={{ color: NAVY }}>Log Trip</span>
+                  </button>
+                  <button onClick={() => setAssistantOpen(true)} disabled={demoMode || !ASSISTANT_URL} className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-white border shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ borderColor: GREY_LINE }}>
+                    <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: NAVY }}><Mic size={18} color="#fff" /></div>
+                    <span className="text-xs font-semibold" style={{ color: NAVY }}>Ask TaxMate</span>
+                  </button>
+                </div>
+              </div>
+
               {!activeData.profile.quickSetupDone ? (
                 <QuickSetupCard
                   occupation={activeData.profile.occupation}
@@ -1533,24 +1551,6 @@ export default function App() {
                   </button>
                 </Card>
               )}
-
-              <div>
-                <div className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Quick actions</div>
-                <div className="grid grid-cols-3 gap-3">
-                  <button onClick={quickUploadReceipt} disabled={demoMode} className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-white border shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ borderColor: GREY_LINE }}>
-                    <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: NAVY }}><Camera size={18} color="#fff" /></div>
-                    <span className="text-xs font-semibold" style={{ color: NAVY }}>Scan Receipt</span>
-                  </button>
-                  <button onClick={quickLogTravel} disabled={demoMode} className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-white border shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ borderColor: GREY_LINE }}>
-                    <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: NAVY }}><Car size={18} color="#fff" /></div>
-                    <span className="text-xs font-semibold" style={{ color: NAVY }}>Log Trip</span>
-                  </button>
-                  <button onClick={() => setAssistantOpen(true)} disabled={demoMode || !ASSISTANT_URL} className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-white border shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ borderColor: GREY_LINE }}>
-                    <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: NAVY }}><Mic size={18} color="#fff" /></div>
-                    <span className="text-xs font-semibold" style={{ color: NAVY }}>Ask TaxMate</span>
-                  </button>
-                </div>
-              </div>
             </div>
           )}
 
