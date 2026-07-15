@@ -4,7 +4,7 @@ import {
   GraduationCap, FileText, Plus, Trash2, ChevronRight, Menu,
   Download, Printer, TrendingUp, Gauge, MapPin, Sparkles, Camera,
   Check, CheckCircle2, AlertTriangle, Fuel, Upload, ShieldCheck, X,
-  Search, SlidersHorizontal, Send, Mic, LogOut,
+  Search, SlidersHorizontal, Send, Mic, LogOut, Landmark,
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import type { AppData, Receipt as ReceiptT, Trip, CategoryKey, Profile } from "./types";
@@ -12,19 +12,20 @@ import { loadData, saveData, loadDemoFlag, saveDemoFlag } from "./lib/storage";
 import { supabase, arrivedViaInviteOrRecovery } from "./lib/supabaseClient";
 import { SAMPLE_DATA } from "./sampleData";
 import { parseDriversnoteCSV } from "./csv";
+import BenefitsFeature from "./benefits/BenefitsFeature";
 
 /* ---------------------------------------------------------------
    Design tokens
 ----------------------------------------------------------------*/
-const NAVY = "#132038";
-const NAVY_SOFT = "#3A4A66";
-const TEAL = "#0E9C94";
-const TEAL_DARK = "#0B7A73";
-const TEAL_TINT = "#E6F5F3";
+export const NAVY = "#132038";
+export const NAVY_SOFT = "#3A4A66";
+export const TEAL = "#0E9C94";
+export const TEAL_DARK = "#0B7A73";
+export const TEAL_TINT = "#E6F5F3";
 const GREY_BG = "#F6F7F9";
-const GREY_LINE = "#E7E9EE";
-const AMBER = "#C77F1A";
-const AMBER_TINT = "#FBF0DE";
+export const GREY_LINE = "#E7E9EE";
+export const AMBER = "#C77F1A";
+export const AMBER_TINT = "#FBF0DE";
 
 interface CategoryDef {
   key: CategoryKey;
@@ -155,7 +156,7 @@ function AnimatedNumber({ value, format = fmt, duration = 700 }: { value: number
   return <>{format(display)}</>;
 }
 
-function Card({ children, className = "", style, delay = 0 }: { children: React.ReactNode; className?: string; style?: React.CSSProperties; delay?: number }) {
+export function Card({ children, className = "", style, delay = 0 }: { children: React.ReactNode; className?: string; style?: React.CSSProperties; delay?: number }) {
   return (
     <div
       className={`fade-up bg-white rounded-2xl border border-[#E7E9EE] shadow-card hover:shadow-card-hover transition-shadow duration-300 ${className}`}
@@ -166,7 +167,7 @@ function Card({ children, className = "", style, delay = 0 }: { children: React.
   );
 }
 
-function SectionTitle({ eyebrow, title, sub, action }: { eyebrow?: string; title: string; sub?: string; action?: React.ReactNode }) {
+export function SectionTitle({ eyebrow, title, sub, action }: { eyebrow?: string; title: string; sub?: string; action?: React.ReactNode }) {
   return (
     <div className="flex items-end justify-between mb-4 flex-wrap gap-3">
       <div>
@@ -179,7 +180,7 @@ function SectionTitle({ eyebrow, title, sub, action }: { eyebrow?: string; title
   );
 }
 
-function Pill({ children, tone = "grey" }: { children: React.ReactNode; tone?: "grey" | "teal" | "amber" }) {
+export function Pill({ children, tone = "grey" }: { children: React.ReactNode; tone?: "grey" | "teal" | "amber" }) {
   const tones: Record<string, string> = {
     grey: "bg-[#F0F1F4] text-[#5B6472]",
     teal: "text-white",
@@ -189,7 +190,7 @@ function Pill({ children, tone = "grey" }: { children: React.ReactNode; tone?: "
   return <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${tones[tone]}`} style={style}>{children}</span>;
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
       <span className="block text-xs font-medium mb-1.5" style={{ color: NAVY_SOFT }}>{label}</span>
@@ -198,9 +199,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-const inputCls = "w-full rounded-xl border border-[#E7E9EE] bg-[#FBFBFC] px-3 py-2 text-sm text-[#132038] focus:outline-none focus:ring-2 focus:ring-teal focus:border-transparent transition disabled:opacity-50 disabled:cursor-not-allowed";
+export const inputCls = "w-full rounded-xl border border-[#E7E9EE] bg-[#FBFBFC] px-3 py-2 text-sm text-[#132038] focus:outline-none focus:ring-2 focus:ring-teal focus:border-transparent transition disabled:opacity-50 disabled:cursor-not-allowed";
 
-function EmptyState({ icon: Icon, title, subtitle, action }: { icon: React.ElementType; title: string; subtitle: string; action?: React.ReactNode }) {
+export function EmptyState({ icon: Icon, title, subtitle, action }: { icon: React.ElementType; title: string; subtitle: string; action?: React.ReactNode }) {
   return (
     <div className="flex flex-col items-center text-center py-10 px-4">
       <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3" style={{ backgroundColor: TEAL_TINT }}>
@@ -797,7 +798,7 @@ function AuthScreen({ needsPasswordSetup, onPasswordSet }: { needsPasswordSetup:
 /* =================================================================
    MAIN APP
 ==================================================================*/
-type TabKey = "overview" | "vehicle" | "expenses" | "progress" | "summary";
+type TabKey = "overview" | "vehicle" | "expenses" | "progress" | "summary" | "benefits";
 
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined); // undefined = still checking
@@ -1252,6 +1253,7 @@ export default function App() {
     { key: "overview", label: "Home", icon: LayoutDashboard },
     { key: "vehicle", label: "Logbook", icon: Car },
     { key: "expenses", label: "Deductions", icon: Wrench },
+    { key: "benefits", label: "Benefits", icon: Landmark },
     { key: "progress", label: "Progress", icon: ShieldCheck },
   ];
 
@@ -1748,6 +1750,8 @@ export default function App() {
               <p className="text-xs text-center pb-4" style={{ color: "#B7BEC9" }}>This dashboard is a record-keeping tool, not tax advice. Confirm deductibility with a registered tax agent.</p>
             </div>
           )}
+
+          {tab === "benefits" && <BenefitsFeature />}
         </main>
       </div>
 
