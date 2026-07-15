@@ -5,7 +5,7 @@ import {
   Download, Printer, TrendingUp, Gauge, MapPin, Sparkles, Camera,
   Check, CheckCircle2, AlertTriangle, Fuel, Upload, ShieldCheck, X,
   Search, SlidersHorizontal, Send, Mic, LogOut, Landmark,
-  Info, Wallet, Bell, MoreHorizontal, WashingMachine,
+  Info, Wallet, Bell, MoreHorizontal, WashingMachine, Settings as SettingsIcon,
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import type { AppData, Receipt as ReceiptT, Trip, CategoryKey, Profile } from "./types";
@@ -876,7 +876,7 @@ function AuthScreen({ needsPasswordSetup, onPasswordSet }: { needsPasswordSetup:
 /* =================================================================
    MAIN APP
 ==================================================================*/
-type TabKey = "overview" | "vehicle" | "expenses" | "progress" | "summary" | "benefits";
+type TabKey = "overview" | "vehicle" | "expenses" | "progress" | "summary" | "benefits" | "settings";
 
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined); // undefined = still checking
@@ -902,7 +902,6 @@ export default function App() {
   const csvInputRef = useRef<HTMLInputElement>(null);
   const receiptInputRef = useRef<HTMLInputElement>(null);
   const receiptsListRef = useRef<HTMLDivElement>(null);
-  const deductionSettingsRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -1288,8 +1287,8 @@ export default function App() {
     { key: "vehicle" as const, label: "Vehicle", icon: Car, amount: catByKey("vehicle").deductible, sub: `${businessPct}% business use`, needsSetup: false, onGo: () => goToReceiptsFiltered("vehicle") },
     { key: "ppe" as const, label: "PPE & Safety Gear", icon: HardHat, amount: catByKey("ppe").deductible, sub: `${catByKey("ppe").count} receipt${catByKey("ppe").count === 1 ? "" : "s"}`, needsSetup: false, onGo: () => goToReceiptsFiltered("ppe") },
     { key: "clothing" as const, label: "Clothing & Uniforms", icon: Shirt, amount: catByKey("clothing").deductible, sub: `${catByKey("clothing").count} receipt${catByKey("clothing").count === 1 ? "" : "s"}`, needsSetup: false, onGo: () => goToReceiptsFiltered("clothing") },
-    { key: "phone" as const, label: "Phone & Internet", icon: Smartphone, amount: catByKey("phone").deductible, sub: phonePctAdded ? `${catByKey("phone").count} receipt${catByKey("phone").count === 1 ? "" : "s"}` : "Add your work-use %", needsSetup: !phonePctAdded, onGo: () => (phonePctAdded ? goToReceiptsFiltered("phone") : deductionSettingsRef.current?.scrollIntoView({ behavior: "smooth" })) },
-    { key: "laundry" as const, label: "Laundry", icon: WashingMachine, amount: laundryEstimate, sub: laundryAdded ? "Claimed" : "Add your estimate", needsSetup: !laundryAdded, onGo: () => deductionSettingsRef.current?.scrollIntoView({ behavior: "smooth" }) },
+    { key: "phone" as const, label: "Phone & Internet", icon: Smartphone, amount: catByKey("phone").deductible, sub: phonePctAdded ? `${catByKey("phone").count} receipt${catByKey("phone").count === 1 ? "" : "s"}` : "Add your work-use %", needsSetup: !phonePctAdded, onGo: () => (phonePctAdded ? goToReceiptsFiltered("phone") : setTab("settings")) },
+    { key: "laundry" as const, label: "Laundry", icon: WashingMachine, amount: laundryEstimate, sub: laundryAdded ? "Claimed" : "Add your estimate", needsSetup: !laundryAdded, onGo: () => setTab("settings") },
   ];
   const maxCategoryRowAmount = Math.max(...deductionCategoryRows.map((r) => r.amount), 1);
   const recentReceipts = receiptsWithNum.slice(0, 8);
@@ -1398,6 +1397,9 @@ export default function App() {
             ))}
           </nav>
           <div className="mt-auto pt-6 space-y-2">
+            <button onClick={() => setTab("settings")} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all" style={tab === "settings" ? { backgroundColor: TEAL_TINT, color: TEAL_DARK } : { color: "#5B6472" }}>
+              <SettingsIcon size={17} />Settings{tab === "settings" && <ChevronRight size={14} className="ml-auto" />}
+            </button>
             <button onClick={demoMode ? disableDemo : enableDemo} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold border transition" style={demoMode ? { backgroundColor: AMBER_TINT, borderColor: AMBER_TINT, color: "#8A5A0F" } : { borderColor: GREY_LINE, color: NAVY_SOFT }}>
               {demoMode ? <><X size={13} /> Clear demo data</> : <><Sparkles size={13} /> View sample apprentice data</>}
             </button>
@@ -1421,6 +1423,9 @@ export default function App() {
             </button>
             <button onClick={() => { setTab("summary"); setMobileNav(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium" style={tab === "summary" ? { backgroundColor: TEAL_TINT, color: TEAL_DARK } : { color: "#5B6472" }}>
               <FileText size={17} />Accountant Pack
+            </button>
+            <button onClick={() => { setTab("settings"); setMobileNav(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium" style={tab === "settings" ? { backgroundColor: TEAL_TINT, color: TEAL_DARK } : { color: "#5B6472" }}>
+              <SettingsIcon size={17} />Settings
             </button>
             <div className="pt-2 mt-1 space-y-2" style={{ borderTop: "1px solid " + GREY_LINE }}>
               <button onClick={() => { demoMode ? disableDemo() : enableDemo(); setMobileNav(false); }} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold border" style={demoMode ? { backgroundColor: AMBER_TINT, borderColor: AMBER_TINT, color: "#8A5A0F" } : { borderColor: GREY_LINE, color: NAVY_SOFT }}>
@@ -1695,14 +1700,10 @@ export default function App() {
                 Log Trip
               </button>
 
-              <Disclosure title="Vehicle details">
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Make"><input disabled={demoMode} value={activeData.profile.vehicle.make} onChange={(e) => setVehicle("make", e.target.value)} className={inputCls} placeholder="Toyota" /></Field>
-                  <Field label="Model"><input disabled={demoMode} value={activeData.profile.vehicle.model} onChange={(e) => setVehicle("model", e.target.value)} className={inputCls} placeholder="HiLux" /></Field>
-                  <Field label="Rego"><input disabled={demoMode} value={activeData.profile.vehicle.rego} onChange={(e) => setVehicle("rego", e.target.value)} className={inputCls} placeholder="1AB2CD" /></Field>
-                  <Field label="Opening odometer (km)"><input disabled={demoMode} type="number" value={activeData.profile.vehicle.openingOdometer} onChange={(e) => setVehicle("openingOdometer", Number(e.target.value))} className={inputCls} /></Field>
-                </div>
-              </Disclosure>
+              <button onClick={() => setTab("settings")} className="w-full flex items-center justify-between px-5 py-4 rounded-2xl border bg-white text-left transition hover:bg-[#FBFBFC]" style={{ borderColor: GREY_LINE }}>
+                <span className="text-sm font-semibold" style={{ color: NAVY }}>Vehicle details</span>
+                <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: TEAL_DARK }}>Edit in Settings<ChevronRight size={14} /></span>
+              </button>
 
               <Disclosure title="Recommended method">
                 <MethodCompareCard centsPerKmEstimate={centsPerKmEstimate} logbookEstimate={logbookEstimate} logbookReady={logbookReady} businessKm={businessKm} />
@@ -1879,25 +1880,10 @@ export default function App() {
                 </Card>
               )}
 
-              <div ref={deductionSettingsRef}>
-                <Disclosure title="Your details & other deductions">
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <Field label="Your name"><input disabled={demoMode} value={activeData.profile.name} onChange={(e) => setProfile("name", e.target.value)} placeholder="Optional" className={inputCls} /></Field>
-                      <Field label="Tax withheld ($)"><input disabled={demoMode} type="number" value={activeData.profile.taxWithheld} onChange={(e) => setProfile("taxWithheld", Number(e.target.value))} className={inputCls} /></Field>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <Field label={`Laundry & uniform estimate (up to $${LAUNDRY_ATO_CAP} without receipts)`}>
-                        <input disabled={demoMode} type="number" value={activeData.profile.laundryEstimate} onChange={(e) => setProfile("laundryEstimate", Number(e.target.value))} className={inputCls} />
-                      </Field>
-                      <Field label="Phone & internet work-use %">
-                        <input disabled={demoMode} type="number" min={0} max={100} value={activeData.profile.phoneWorkPct} onChange={(e) => setProfile("phoneWorkPct", Number(e.target.value))} className={inputCls} />
-                      </Field>
-                    </div>
-                    <p className="text-xs leading-relaxed" style={{ color: "#8A93A3" }}>The ATO allows a reasonable estimate for laundering work uniforms without keeping receipts, up to ${LAUNDRY_ATO_CAP} a year. Your phone % should reflect genuine work use — check a typical bill if you're not sure.</p>
-                  </div>
-                </Disclosure>
-              </div>
+              <button onClick={() => setTab("settings")} className="w-full flex items-center justify-between px-5 py-4 rounded-2xl border bg-white text-left transition hover:bg-[#FBFBFC]" style={{ borderColor: GREY_LINE }}>
+                <span className="text-sm font-semibold" style={{ color: NAVY }}>Your details & other deductions</span>
+                <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: TEAL_DARK }}>Edit in Settings<ChevronRight size={14} /></span>
+              </button>
 
               <Card className="p-2 sm:p-4">
                 <div ref={receiptsListRef} style={{ scrollMarginTop: "80px" }} />
@@ -1979,6 +1965,73 @@ export default function App() {
           )}
 
           {tab === "benefits" && <BenefitsFeature />}
+
+          {tab === "settings" && (
+            <div className="space-y-6">
+              <SectionTitle title="Settings" sub="Manage your profile, vehicle and deduction details." />
+
+              <Card className="p-5">
+                <SectionTitle title="Profile & tax details" eyebrow="Used across your dashboard and accountant summary" />
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Your name"><input disabled={demoMode} value={activeData.profile.name} onChange={(e) => setProfile("name", e.target.value)} placeholder="Optional" className={inputCls} /></Field>
+                  <Field label="Occupation"><input disabled={demoMode} value={activeData.profile.occupation} onChange={(e) => setProfile("occupation", e.target.value)} className={inputCls} /></Field>
+                  <Field label="Income ($)"><input disabled={demoMode} type="number" value={activeData.profile.income} onChange={(e) => setProfile("income", Number(e.target.value))} className={inputCls} /></Field>
+                  <Field label="Tax withheld ($)"><input disabled={demoMode} type="number" value={activeData.profile.taxWithheld} onChange={(e) => setProfile("taxWithheld", Number(e.target.value))} className={inputCls} /></Field>
+                </div>
+              </Card>
+
+              <Card className="p-5">
+                <SectionTitle title="Vehicle details" eyebrow="Used for your logbook and odometer tracking" />
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Make"><input disabled={demoMode} value={activeData.profile.vehicle.make} onChange={(e) => setVehicle("make", e.target.value)} className={inputCls} placeholder="Toyota" /></Field>
+                  <Field label="Model"><input disabled={demoMode} value={activeData.profile.vehicle.model} onChange={(e) => setVehicle("model", e.target.value)} className={inputCls} placeholder="HiLux" /></Field>
+                  <Field label="Rego"><input disabled={demoMode} value={activeData.profile.vehicle.rego} onChange={(e) => setVehicle("rego", e.target.value)} className={inputCls} placeholder="1AB2CD" /></Field>
+                  <Field label="Opening odometer (km)"><input disabled={demoMode} type="number" value={activeData.profile.vehicle.openingOdometer} onChange={(e) => setVehicle("openingOdometer", Number(e.target.value))} className={inputCls} /></Field>
+                </div>
+              </Card>
+
+              <Card className="p-5">
+                <SectionTitle title="Other common deductions" eyebrow="No receipts needed under ATO thresholds" />
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label={`Laundry & uniform estimate (up to $${LAUNDRY_ATO_CAP} without receipts)`}>
+                    <input disabled={demoMode} type="number" value={activeData.profile.laundryEstimate} onChange={(e) => setProfile("laundryEstimate", Number(e.target.value))} className={inputCls} />
+                  </Field>
+                  <Field label="Phone & internet work-use %">
+                    <input disabled={demoMode} type="number" min={0} max={100} value={activeData.profile.phoneWorkPct} onChange={(e) => setProfile("phoneWorkPct", Number(e.target.value))} className={inputCls} />
+                  </Field>
+                </div>
+                <p className="text-xs mt-3 leading-relaxed" style={{ color: "#8A93A3" }}>The ATO allows a reasonable estimate for laundering work uniforms without keeping receipts, up to ${LAUNDRY_ATO_CAP} a year. Your phone % should reflect genuine work use — check a typical bill if you're not sure.</p>
+              </Card>
+
+              <Card className="p-5">
+                <SectionTitle title="AI travel memory" eyebrow="What TaxMate AI remembers when you log trips" />
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Home address">
+                    <input disabled={demoMode} value={activeData.profile.homeAddress || ""} onChange={(e) => updateTravelProfile({ homeAddress: e.target.value })} placeholder="e.g. 18 Maureen Close, Cranbourne West" className={inputCls} />
+                  </Field>
+                  <Field label="Usual trip type">
+                    <select disabled={demoMode} value={activeData.profile.assumeRoundTrip === false ? "one_way" : "round_trip"} onChange={(e) => updateTravelProfile({ assumeRoundTrip: e.target.value === "round_trip" })} className={inputCls}>
+                      <option value="round_trip">Round trip (there and back)</option>
+                      <option value="one_way">One-way</option>
+                    </select>
+                  </Field>
+                </div>
+                <p className="text-xs mt-3 leading-relaxed" style={{ color: "#8A93A3" }}>TaxMate AI uses these so it doesn't have to ask every time you log a trip — it'll also update them automatically as you chat.</p>
+              </Card>
+
+              <Card className="p-5">
+                <SectionTitle title="Account" />
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={demoMode ? disableDemo : enableDemo} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition" style={demoMode ? { backgroundColor: AMBER_TINT, borderColor: AMBER_TINT, color: "#8A5A0F" } : { borderColor: GREY_LINE, color: NAVY_SOFT }}>
+                    {demoMode ? <><X size={15} /> Clear demo data</> : <><Sparkles size={15} /> View sample apprentice data</>}
+                  </button>
+                  <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition" style={{ borderColor: GREY_LINE, color: NAVY_SOFT }}>
+                    <LogOut size={15} /> Log out
+                  </button>
+                </div>
+              </Card>
+            </div>
+          )}
         </main>
       </div>
 
@@ -1988,7 +2041,7 @@ export default function App() {
             <n.icon size={19} /><span className="text-[9.5px] font-medium text-center leading-tight">{n.label}</span>
           </button>
         ))}
-        <button onClick={() => setMobileNav((v) => !v)} className="flex flex-col items-center gap-0.5 py-1.5 px-1 rounded-xl flex-1" style={mobileNav || tab === "progress" || tab === "summary" ? { color: TEAL_DARK } : { color: "#B7BEC9" }}>
+        <button onClick={() => setMobileNav((v) => !v)} className="flex flex-col items-center gap-0.5 py-1.5 px-1 rounded-xl flex-1" style={mobileNav || tab === "progress" || tab === "summary" || tab === "settings" ? { color: TEAL_DARK } : { color: "#B7BEC9" }}>
           <MoreHorizontal size={19} /><span className="text-[9.5px] font-medium text-center leading-tight">More</span>
         </button>
       </div>
