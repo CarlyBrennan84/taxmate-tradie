@@ -83,6 +83,15 @@ interface ScannedReceipt {
   confidence?: "high" | "medium" | "low";
 }
 
+interface ScanQueueItem {
+  id: string;
+  file: File;
+  thumb: string;
+  result: ScannedReceipt | null;
+  scanning: boolean;
+  failed: boolean;
+}
+
 function resizeImageForScan(file: File, maxEdge = 1568, quality = 0.85): Promise<{ base64: string; mediaType: string }> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -282,14 +291,65 @@ function ReceiptForm({ onSave, onCancel, categoryLock, initial }: { onSave: (r: 
   );
 }
 
-function ReceiptRow({ r, onDelete, onEdit, thumb, scanning }: { r: ReceiptT; onDelete: (id: string) => void; onEdit: (r: ReceiptT) => void; thumb?: string; scanning?: boolean }) {
+function ReceiptReviewModal({ item, onSave, onCancel }: { item: ScanQueueItem; onSave: (r: ReceiptT) => void; onCancel: () => void }) {
+  const result = item.result;
+  const initial: ReceiptT = {
+    id: item.id,
+    date: result?.date || todayISO(),
+    vendor: result?.vendor || item.file.name.replace(/\.[^/.]+$/, ""),
+    category: result?.category || "other",
+    amount: result?.amount && result.amount > 0 ? result.amount : 0,
+    workPct: 100,
+    filed: false,
+    notes: result ? (result.confidence === "low" ? "Auto-filled by AI — please double-check these details" : "Auto-filled by AI — check before filing") : "",
+  };
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-semibold" style={{ color: NAVY }}>Review receipt</span>
+        <button onClick={onCancel} className="p-1.5 rounded-lg text-[#B7BEC9] hover:bg-[#F0F1F4] transition"><X size={16} /></button>
+      </div>
+      {item.thumb && <img src={item.thumb} alt="" className="w-full max-h-52 object-cover rounded-2xl" />}
+      {item.scanning ? (
+        <div className="flex flex-col items-center gap-3 py-8">
+          <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: TEAL, borderTopColor: "transparent" }} />
+          <span className="text-sm font-medium" style={{ color: NAVY }}>Reading your receipt…</span>
+        </div>
+      ) : (
+        <>
+          {result && (
+            <Card className="p-4 flex items-start gap-3">
+              <Sparkles size={16} color={TEAL_DARK} className="flex-shrink-0 mt-0.5" />
+              <div>
+                <div className="text-sm font-semibold" style={{ color: NAVY }}>AI Detected</div>
+                <div className="text-xs mt-0.5 mb-2" style={{ color: "#8A93A3" }}>We've read your receipt — check the details below before saving.</div>
+                <Pill tone={result.confidence === "low" ? "amber" : "teal"}>
+                  {result.confidence === "low" ? "Low confidence — please check" : result.confidence === "medium" ? "Medium confidence" : "High confidence"}
+                </Pill>
+              </div>
+            </Card>
+          )}
+          {item.failed && (
+            <Card className="p-4 flex items-center gap-2.5" style={{ backgroundColor: AMBER_TINT }}>
+              <AlertTriangle size={16} color={AMBER} className="flex-shrink-0" />
+              <span className="text-sm" style={{ color: "#8A5A0F" }}>Couldn't read this one automatically — fill in the details manually.</span>
+            </Card>
+          )}
+          <ReceiptForm initial={initial} onSave={onSave} onCancel={onCancel} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function ReceiptRow({ r, onDelete, onEdit }: { r: ReceiptT; onDelete: (id: string) => void; onEdit: (r: ReceiptT) => void }) {
   const ded = r.amount * (r.workPct / 100);
   const cat = CATEGORIES.find((c) => c.key === r.category);
   const incomplete = !r.vendor || !r.amount;
   return (
-    <div role="button" tabIndex={0} onClick={() => !scanning && onEdit(r)} onKeyDown={(e) => { if (!scanning && (e.key === "Enter" || e.key === " ")) onEdit(r); }} className={`w-full flex items-center gap-3 py-3 px-1 border-b last:border-0 text-left transition hover:bg-[#FBFBFC] ${scanning ? "cursor-default" : "cursor-pointer"}`} style={{ borderColor: GREY_LINE }}>
+    <div role="button" tabIndex={0} onClick={() => onEdit(r)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onEdit(r); }} className="w-full flex items-center gap-3 py-3 px-1 border-b last:border-0 text-left transition hover:bg-[#FBFBFC] cursor-pointer" style={{ borderColor: GREY_LINE }}>
       <div className="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL_TINT }}>
-        {thumb ? <img src={thumb} alt="" className={`w-full h-full object-cover ${scanning ? "animate-pulse" : ""}`} /> : cat && <cat.icon size={16} color={TEAL_DARK} />}
+        {cat && <cat.icon size={16} color={TEAL_DARK} />}
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium truncate" style={{ color: NAVY }}>{r.vendor || "Untitled receipt"}</div>
@@ -299,12 +359,7 @@ function ReceiptRow({ r, onDelete, onEdit, thumb, scanning }: { r: ReceiptT; onD
         <div className="text-sm font-semibold" style={{ color: NAVY }}>{fmtDec(r.amount)}</div>
         <div className="text-[11px] text-[#8A93A3]">{r.workPct}% · ded. {fmtDec(ded)}</div>
       </div>
-      {scanning ? (
-        <div className="flex items-center gap-1.5 text-xs font-medium flex-shrink-0" style={{ color: TEAL_DARK }}>
-          <div className="w-3.5 h-3.5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: TEAL, borderTopColor: "transparent" }} />
-          Reading receipt…
-        </div>
-      ) : incomplete ? <Pill tone="amber">Needs details</Pill> : r.filed ? <Pill tone="teal">Filed</Pill> : <Pill tone="amber">To file</Pill>}
+      {incomplete ? <Pill tone="amber">Needs details</Pill> : r.filed ? <Pill tone="teal">Filed</Pill> : <Pill tone="amber">To file</Pill>}
       <button onClick={(e) => { e.stopPropagation(); onDelete(r.id); }} className="p-1.5 rounded-lg text-[#B7BEC9] hover:text-[#C4573F] hover:bg-[#FBEAE6] transition flex-shrink-0"><Trash2 size={15} /></button>
     </div>
   );
@@ -838,8 +893,7 @@ export default function App() {
   const [editingReceipt, setEditingReceipt] = useState<ReceiptT | null>(null);
   const [showTripForm, setShowTripForm] = useState(false);
   const [showLogbookInfo, setShowLogbookInfo] = useState(false);
-  const [thumbs, setThumbs] = useState<Record<string, string>>({});
-  const [scanningIds, setScanningIds] = useState<Set<string>>(new Set());
+  const [scanQueue, setScanQueue] = useState<ScanQueueItem[]>([]);
   const [demoMode, setDemoMode] = useState<boolean>(() => loadDemoFlag());
   const [csvPreview, setCsvPreview] = useState<Trip[] | null>(null);
   const [assistantOpen, setAssistantOpen] = useState(false);
@@ -923,31 +977,18 @@ export default function App() {
   const setVehicle = <K extends keyof AppData["profile"]["vehicle"]>(k: K, v: AppData["profile"]["vehicle"][K]) => update((d) => { d.profile.vehicle[k] = v; return d; });
 
   const scanReceipt = async (id: string, file: File) => {
-    if (!RECEIPT_SCANNER_URL) return;
-    setScanningIds((p) => new Set(p).add(id));
     try {
       const { base64, mediaType } = await resizeImageForScan(file);
-      const res = await fetch(RECEIPT_SCANNER_URL, {
+      const res = await fetch(RECEIPT_SCANNER_URL!, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: base64, mediaType }),
       });
       if (!res.ok) throw new Error("scan failed");
       const result: ScannedReceipt = await res.json();
-      update((d) => {
-        const r = d.receipts.find((r) => r.id === id);
-        if (!r) return d;
-        if (result.vendor) r.vendor = result.vendor;
-        if (result.date) r.date = result.date;
-        if (typeof result.amount === "number" && result.amount > 0) r.amount = result.amount;
-        if (result.category) r.category = result.category;
-        r.notes = result.confidence === "low" ? "Auto-filled by AI — please double-check these details" : "Auto-filled by AI — check before filing";
-        return d;
-      });
+      setScanQueue((p) => p.map((it) => (it.id === id ? { ...it, result, scanning: false } : it)));
     } catch {
-      // Scan failed — leave the manual placeholder in place for the user to fill in.
-    } finally {
-      setScanningIds((p) => { const n = new Set(p); n.delete(id); return n; });
+      setScanQueue((p) => p.map((it) => (it.id === id ? { ...it, scanning: false, failed: true } : it)));
     }
   };
 
@@ -955,16 +996,19 @@ export default function App() {
     if (demoMode) return;
     files.forEach((f) => {
       const id = uid();
-      if (f.type.startsWith("image/")) {
+      const isImage = f.type.startsWith("image/");
+      if (isImage) {
         const reader = new FileReader();
-        reader.onload = (e) => setThumbs((p) => ({ ...p, [id]: e.target?.result as string }));
+        reader.onload = (e) => {
+          const thumb = (e.target?.result as string) || "";
+          const willScan = !!RECEIPT_SCANNER_URL;
+          setScanQueue((p) => [...p, { id, file: f, thumb, result: null, scanning: willScan, failed: false }]);
+          if (willScan) scanReceipt(id, f);
+        };
         reader.readAsDataURL(f);
-        scanReceipt(id, f);
+      } else {
+        setScanQueue((p) => [...p, { id, file: f, thumb: "", result: null, scanning: false, failed: false }]);
       }
-      update((d) => {
-        d.receipts.unshift({ id, date: todayISO(), vendor: f.name.replace(/\.[^/.]+$/, ""), category: "other", amount: 0, workPct: 100, filed: false, notes: "Uploaded — add amount & category", fileName: f.name });
-        return d;
-      });
     });
   };
 
@@ -1575,7 +1619,7 @@ export default function App() {
                   {receiptsForTab.length === 0 ? (
                     <EmptyState icon={Receipt} title="Nothing here" subtitle="Tap the + button to scan a receipt — TaxMate will sort it into the right category." />
                   ) : (
-                    receiptsForTab.map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} onEdit={setEditingReceipt} thumb={thumbs[r.id]} scanning={scanningIds.has(r.id)} />)
+                    receiptsForTab.map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} onEdit={setEditingReceipt} />)
                   )}
                 </div>
               </Card>
@@ -1694,7 +1738,7 @@ export default function App() {
                   {receiptsWithNum.filter((r) => r.category === "vehicle").length === 0 ? (
                     <EmptyState icon={Fuel} title="No vehicle expenses yet" subtitle={'Scan a fuel, servicing or insurance receipt and tag it as "Vehicle & Fuel".'} />
                   ) : (
-                    receiptsWithNum.filter((r) => r.category === "vehicle").map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} onEdit={setEditingReceipt} thumb={thumbs[r.id]} scanning={scanningIds.has(r.id)} />)
+                    receiptsWithNum.filter((r) => r.category === "vehicle").map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} onEdit={setEditingReceipt} />)
                   )}
                 </div>
               </Card>
@@ -1749,7 +1793,7 @@ export default function App() {
                   {filteredReceipts.filter((r) => receiptCategoryFilter !== "all" || r.category !== "vehicle").length === 0 ? (
                     <EmptyState icon={Wrench} title="Nothing here yet" subtitle="Tap the + button to scan a receipt straight into this category." />
                   ) : (
-                    filteredReceipts.filter((r) => receiptCategoryFilter !== "all" || r.category !== "vehicle").map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} onEdit={setEditingReceipt} thumb={thumbs[r.id]} scanning={scanningIds.has(r.id)} />)
+                    filteredReceipts.filter((r) => receiptCategoryFilter !== "all" || r.category !== "vehicle").map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} onEdit={setEditingReceipt} />)
                   )}
                 </div>
               </Card>
@@ -1837,6 +1881,18 @@ export default function App() {
               categoryLock={editingReceipt ? undefined : receiptFormCategoryLock}
               onSave={editingReceipt ? saveReceiptEdit : addReceipt}
               onCancel={() => { setShowReceiptForm(false); setReceiptFormCategoryLock(undefined); setEditingReceipt(null); }}
+            />
+          </div>
+        </div>
+      )}
+
+      {scanQueue.length > 0 && !demoMode && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
+          <div className="w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl p-5 max-h-[92vh] overflow-y-auto">
+            <ReceiptReviewModal
+              item={scanQueue[0]}
+              onSave={(r) => { addReceipt(r); setScanQueue((p) => p.slice(1)); }}
+              onCancel={() => setScanQueue((p) => p.slice(1))}
             />
           </div>
         </div>
