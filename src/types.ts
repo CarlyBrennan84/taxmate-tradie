@@ -44,6 +44,9 @@ export interface Profile {
   laundryEstimate: number;
   vehicle: VehicleDetails;
   quickSetupDone: boolean;
+  homeAddress?: string;
+  lastWorksite?: string;
+  assumeRoundTrip?: boolean;
 }
 
 export interface AppData {

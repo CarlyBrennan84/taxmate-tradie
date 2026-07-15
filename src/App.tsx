@@ -7,7 +7,7 @@ import {
   Search, SlidersHorizontal, Send, Mic, LogOut,
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
-import type { AppData, Receipt as ReceiptT, Trip, CategoryKey } from "./types";
+import type { AppData, Receipt as ReceiptT, Trip, CategoryKey, Profile } from "./types";
 import { loadData, saveData, loadDemoFlag, saveDemoFlag } from "./lib/storage";
 import { supabase, arrivedViaInviteOrRecovery } from "./lib/supabaseClient";
 import { SAMPLE_DATA } from "./sampleData";
@@ -892,6 +892,8 @@ export default function App() {
   const deleteReceipt = (id: string) => update((d) => { d.receipts = d.receipts.filter((r) => r.id !== id); return d; });
   const saveReceiptEdit = (r: ReceiptT) => { update((d) => { d.receipts = d.receipts.map((existing) => (existing.id === r.id ? r : existing)); return d; }); setEditingReceipt(null); };
   const addTrip = (t: Trip) => { update((d) => { d.trips.unshift(t); return d; }); setShowTripForm(false); };
+  const addTrips = (ts: Trip[]) => { update((d) => { d.trips = [...ts, ...d.trips]; return d; }); };
+  const updateTravelProfile = (patch: Partial<Pick<Profile, "homeAddress" | "lastWorksite" | "assumeRoundTrip">>) => update((d) => { d.profile = { ...d.profile, ...patch }; return d; });
   const deleteTrip = (id: string) => update((d) => { d.trips = d.trips.filter((t) => t.id !== id); return d; });
   const setProfile = <K extends keyof AppData["profile"]>(k: K, v: AppData["profile"][K]) => update((d) => { d.profile[k] = v; return d; });
   const setVehicle = <K extends keyof AppData["profile"]["vehicle"]>(k: K, v: AppData["profile"]["vehicle"][K]) => update((d) => { d.profile.vehicle[k] = v; return d; });
@@ -1024,6 +1026,10 @@ export default function App() {
     receiptsCount: receiptsWithNum.length,
     tripsCount: trips.length,
     logbookDays: Math.min(daysElapsed, 84),
+    today: todayISO(),
+    homeAddress: activeData.profile.homeAddress,
+    lastWorksite: activeData.profile.lastWorksite,
+    assumeRoundTrip: activeData.profile.assumeRoundTrip,
   });
 
   const executeAssistantTool = async (name: string, input: any): Promise<string> => {
@@ -1070,6 +1076,67 @@ export default function App() {
         } catch {
           return JSON.stringify({ error: "Distance lookup failed — check your connection." });
         }
+      }
+      case "update_travel_profile": {
+        const patch: Partial<Pick<Profile, "homeAddress" | "lastWorksite" | "assumeRoundTrip">> = {};
+        if (input.homeAddress) patch.homeAddress = String(input.homeAddress);
+        if (input.lastWorksite) patch.lastWorksite = String(input.lastWorksite);
+        if (typeof input.assumeRoundTrip === "boolean") patch.assumeRoundTrip = input.assumeRoundTrip;
+        updateTravelProfile(patch);
+        return "Saved — I'll remember that next time.";
+      }
+      case "log_trip_range": {
+        if (!DISTANCE_URL) return JSON.stringify({ error: "Distance lookup isn't configured." });
+        const origin = String(input.origin || "").trim();
+        const destination = String(input.destination || "").trim();
+        if (!origin || !destination) return JSON.stringify({ error: "Missing origin or destination." });
+
+        let oneWayKm: number;
+        try {
+          const res = await fetch(DISTANCE_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ origin, destination }),
+          });
+          if (!res.ok) return JSON.stringify({ error: "Distance lookup failed." });
+          const dist = await res.json();
+          oneWayKm = Number(dist.distanceKm) || 0;
+          if (!oneWayKm) return JSON.stringify({ error: dist.error || "Could not determine distance." });
+        } catch {
+          return JSON.stringify({ error: "Distance lookup failed — check your connection." });
+        }
+
+        const parseISODate = (s: string): number => {
+          const [y, m, d] = String(s).split("-").map(Number);
+          return Date.UTC(y || 0, (m || 1) - 1, d || 1);
+        };
+        const start = parseISODate(input.startDate);
+        const end = parseISODate(input.endDate);
+        if (!input.startDate || !input.endDate || isNaN(start) || isNaN(end) || start > end) {
+          return JSON.stringify({ error: "Invalid date range." });
+        }
+
+        const roundTrip = input.roundTrip !== false;
+        const skipWeekends = input.skipWeekends !== false;
+        const tripType: "business" | "personal" = input.tripType === "personal" ? "personal" : "business";
+        const kmPerDay = Math.round((roundTrip ? oneWayKm * 2 : oneWayKm) * 10) / 10;
+        const purpose = String(input.purpose || `${origin} → ${destination}`);
+
+        const dates: string[] = [];
+        const DAY_MS = 86400000;
+        for (let t = start; t <= end; t += DAY_MS) {
+          const day = new Date(t).getUTCDay();
+          if (skipWeekends && (day === 0 || day === 6)) continue;
+          dates.push(new Date(t).toISOString().slice(0, 10));
+        }
+        if (!dates.length) return JSON.stringify({ error: "No workdays fall in that date range." });
+        if (dates.length > 31) return JSON.stringify({ error: "That range is too long — try a shorter one (max 31 days)." });
+
+        const newTrips: Trip[] = dates.map((date) => ({ id: uid(), date, purpose, type: tripType, km: kmPerDay }));
+        addTrips(newTrips);
+        updateTravelProfile({ lastWorksite: destination });
+
+        return JSON.stringify({ created: newTrips.length, kmPerDay, totalKm: Math.round(kmPerDay * newTrips.length * 10) / 10, dates });
       }
       default:
         return "Unknown action.";

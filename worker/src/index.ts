@@ -60,6 +60,36 @@ const ASSISTANT_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "log_trip_range",
+    description: "Log a repeating work trip (e.g. 'home to a job site') across a date range in one go — one trip per workday, distance looked up automatically. Use this instead of calling log_trip repeatedly whenever the user gives you a date range (e.g. 'Wednesday to Friday', 'all of last week', 'Monday to Friday'). Before calling this, briefly summarise your plan (dates, addresses, assumptions) in your text reply and wait for the user to confirm — only call this tool after they've said yes/confirmed.",
+    input_schema: {
+      type: "object",
+      properties: {
+        startDate: { type: "string", description: "First day of the range, yyyy-mm-dd" },
+        endDate: { type: "string", description: "Last day of the range, yyyy-mm-dd (inclusive)" },
+        origin: { type: "string", description: "Starting address or place name for each day's trip. Use the user's known home address from context if they mean 'home' and haven't repeated it." },
+        destination: { type: "string", description: "Ending address or place name for each day's trip" },
+        roundTrip: { type: "boolean", description: "True if each day is a there-and-back trip (default true unless the user says one-way)" },
+        tripType: { type: "string", enum: ["business", "personal"] },
+        skipWeekends: { type: "boolean", description: "True to only log Mon-Fri (default true)" },
+        purpose: { type: "string", description: "Short description, e.g. 'Home to site — Boronia'" },
+      },
+      required: ["startDate", "endDate", "origin", "destination", "purpose"],
+    },
+  },
+  {
+    name: "update_travel_profile",
+    description: "Remember the user's home address and/or their usual travel habits (e.g. they always do a round trip) so you don't have to ask again next time. Call this the first time the user tells you their home address, or confirms a travel default.",
+    input_schema: {
+      type: "object",
+      properties: {
+        homeAddress: { type: "string" },
+        lastWorksite: { type: "string", description: "Most recently mentioned work site, for context in a later message" },
+        assumeRoundTrip: { type: "boolean", description: "Whether the user's trips are normally there-and-back" },
+      },
+    },
+  },
+  {
     name: "add_expense",
     description: "Add a work expense the user tells you about, with no photo (they'll add one later if they have it).",
     input_schema: {
@@ -105,14 +135,34 @@ interface AssistantContext {
   receiptsCount?: number;
   tripsCount?: number;
   logbookDays?: number;
+  today?: string;
+  homeAddress?: string;
+  lastWorksite?: string;
+  assumeRoundTrip?: boolean;
 }
 
 function assistantSystemPrompt(ctx: AssistantContext): string {
+  const knownTravel: string[] = [];
+  if (ctx.homeAddress) knownTravel.push(`home address "${ctx.homeAddress}"`);
+  if (ctx.lastWorksite) knownTravel.push(`last-mentioned work site "${ctx.lastWorksite}"`);
+  if (ctx.assumeRoundTrip !== undefined) knownTravel.push(`trips are ${ctx.assumeRoundTrip ? "normally a round trip" : "normally one-way"}`);
+  const travelLine = knownTravel.length
+    ? `Known travel details — don't ask for these again, just use them: ${knownTravel.join("; ")}.`
+    : `You don't know this user's home address or travel habits yet — the first time they mention one, call update_travel_profile to remember it.`;
+
   return `You are TaxMate AI, a friendly assistant inside TaxMate Tradie — a tax deduction tracker for Australian apprentices and tradies.
+
+Today's date is ${ctx.today || "unknown"} — use it to resolve relative or partial dates (e.g. "last week", "Wednesday 1st July" with no year) into yyyy-mm-dd.
 
 Current snapshot for this user: occupation "${ctx.occupation || "unknown"}", income $${ctx.income ?? 0}, total deductions logged $${ctx.totalDeductions ?? 0}, estimated refund $${ctx.estimatedRefund ?? 0}, ${ctx.receiptsCount ?? 0} receipts logged, ${ctx.tripsCount ?? 0} trips logged, logbook day ${ctx.logbookDays ?? 0} of 84.
 
-You can log trips and expenses the user tells you about, look up/update existing receipts (e.g. mark one as reimbursed by an employer, which is no longer claimable), and calculate real driving distance between two addresses to log a trip when the user names locations instead of a km figure. Keep answers short and practical — this is a mobile chat, not an essay. For deduction questions, give a direct answer with a one-line reason, based on general ATO rules for Australian tradies/apprentices. Make clear this is general guidance, not registered tax advice, whenever the question is genuinely uncertain or high-stakes.`;
+${travelLine}
+
+You can log trips and expenses the user tells you about, look up/update existing receipts (e.g. mark one as reimbursed by an employer, which is no longer claimable), and calculate real driving distance between two addresses to log a trip when the user names locations instead of a km figure. When the user describes a repeating trip across several days (e.g. "log my kms from Wednesday to Friday from home to the site"), use log_trip_range rather than calling log_trip multiple times — briefly state your assumptions (dates, addresses, round trip, workdays only) in plain text and wait for the user to confirm before calling it. For a single one-off trip, just log it — no need to ask first.
+
+Use the user's occupation to infer things without asking: e.g. a plumber mentioning "Reece" means a plumbing supplies store, an electrician mentioning "Middys" or a sparky supplier is a materials run, "Bunnings" or "Total Tools" is a general hardware/tool stop — treat these as business trips/expenses unless context says otherwise.
+
+Keep answers short and practical — this is a mobile chat, not an essay. For deduction questions, give a direct answer with a one-line reason, based on general ATO rules for Australian tradies/apprentices. Make clear this is general guidance, not registered tax advice, whenever the question is genuinely uncertain or high-stakes.`;
 }
 
 function corsHeaders(origin: string | null): Record<string, string> {
