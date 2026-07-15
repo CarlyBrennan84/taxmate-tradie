@@ -5,7 +5,7 @@ import {
   Download, Printer, TrendingUp, Gauge, MapPin, Sparkles, Camera,
   Check, CheckCircle2, AlertTriangle, Fuel, Upload, ShieldCheck, X,
   Search, SlidersHorizontal, Send, Mic, LogOut, Landmark,
-  Info, Wallet, Bell, MoreHorizontal,
+  Info, Wallet, Bell, MoreHorizontal, WashingMachine,
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import type { AppData, Receipt as ReceiptT, Trip, CategoryKey, Profile } from "./types";
@@ -901,6 +901,8 @@ export default function App() {
   const [assistantLoading, setAssistantLoading] = useState(false);
   const csvInputRef = useRef<HTMLInputElement>(null);
   const receiptInputRef = useRef<HTMLInputElement>(null);
+  const receiptsListRef = useRef<HTMLDivElement>(null);
+  const deductionSettingsRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -1279,6 +1281,19 @@ export default function App() {
   const greetingHour = new Date().getHours();
   const greeting = greetingHour < 12 ? "Good morning" : greetingHour < 18 ? "Good afternoon" : "Good evening";
 
+  const catByKey = (k: CategoryKey) => categoryTotals.find((c) => c.key === k)!;
+  const goToReceiptsFiltered = (key: CategoryKey) => { setReceiptCategoryFilter(key); setShowReceiptFilters(true); receiptsListRef.current?.scrollIntoView({ behavior: "smooth" }); };
+  const deductionCategoryRows = [
+    { key: "tools" as const, label: "Tools & Equipment", icon: Wrench, amount: catByKey("tools").deductible, sub: `${catByKey("tools").count} receipt${catByKey("tools").count === 1 ? "" : "s"}`, needsSetup: false, onGo: () => goToReceiptsFiltered("tools") },
+    { key: "vehicle" as const, label: "Vehicle", icon: Car, amount: catByKey("vehicle").deductible, sub: `${businessPct}% business use`, needsSetup: false, onGo: () => goToReceiptsFiltered("vehicle") },
+    { key: "ppe" as const, label: "PPE & Safety Gear", icon: HardHat, amount: catByKey("ppe").deductible, sub: `${catByKey("ppe").count} receipt${catByKey("ppe").count === 1 ? "" : "s"}`, needsSetup: false, onGo: () => goToReceiptsFiltered("ppe") },
+    { key: "clothing" as const, label: "Clothing & Uniforms", icon: Shirt, amount: catByKey("clothing").deductible, sub: `${catByKey("clothing").count} receipt${catByKey("clothing").count === 1 ? "" : "s"}`, needsSetup: false, onGo: () => goToReceiptsFiltered("clothing") },
+    { key: "phone" as const, label: "Phone & Internet", icon: Smartphone, amount: catByKey("phone").deductible, sub: phonePctAdded ? `${catByKey("phone").count} receipt${catByKey("phone").count === 1 ? "" : "s"}` : "Add your work-use %", needsSetup: !phonePctAdded, onGo: () => (phonePctAdded ? goToReceiptsFiltered("phone") : deductionSettingsRef.current?.scrollIntoView({ behavior: "smooth" })) },
+    { key: "laundry" as const, label: "Laundry", icon: WashingMachine, amount: laundryEstimate, sub: laundryAdded ? "Claimed" : "Add your estimate", needsSetup: !laundryAdded, onGo: () => deductionSettingsRef.current?.scrollIntoView({ behavior: "smooth" }) },
+  ];
+  const maxCategoryRowAmount = Math.max(...deductionCategoryRows.map((r) => r.amount), 1);
+  const recentReceipts = receiptsWithNum.slice(0, 8);
+
   const weeklyDeductionsTrend = (() => {
     const weeks = 8;
     const buckets = Array(weeks).fill(0);
@@ -1292,6 +1307,23 @@ export default function App() {
     return buckets.map((b) => (running += b));
   })();
   const weeklyDelta = weeklyDeductionsTrend.length > 1 ? weeklyDeductionsTrend[weeklyDeductionsTrend.length - 1] - weeklyDeductionsTrend[weeklyDeductionsTrend.length - 2] : 0;
+
+  const monthlyDeductionsTrend = (() => {
+    const months = 6;
+    const buckets = Array(months).fill(0);
+    const now = new Date();
+    receiptsWithNum.forEach((r) => {
+      if (!r.date) return;
+      const d = new Date(r.date);
+      const monthsAgo = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+      if (monthsAgo >= 0 && monthsAgo < months) buckets[months - 1 - monthsAgo] += r.amount * (r.workPct / 100);
+    });
+    let running = 0;
+    return buckets.map((b) => (running += b));
+  })();
+  const thisMonthDelta = monthlyDeductionsTrend.length > 1 ? monthlyDeductionsTrend[monthlyDeductionsTrend.length - 1] - monthlyDeductionsTrend[monthlyDeductionsTrend.length - 2] : 0;
+  const lastMonthTotal = monthlyDeductionsTrend.length > 1 ? monthlyDeductionsTrend[monthlyDeductionsTrend.length - 2] : 0;
+  const monthGrowthPct = lastMonthTotal > 0 ? Math.round((thisMonthDelta / lastMonthTotal) * 100) : thisMonthDelta > 0 ? 100 : 0;
 
   const taxReadySummary = [
     { icon: Camera, label: `${receiptsWithNum.length} receipt${receiptsWithNum.length === 1 ? "" : "s"} logged`, done: receiptsWithNum.length > 0 },
@@ -1747,48 +1779,136 @@ export default function App() {
 
           {tab === "expenses" && (
             <div className="space-y-6">
-              <SectionTitle title="Deductions" eyebrow="Tools · Clothing · PPE · Phone · TAFE" sub="Tap a category to filter, or scan a receipt to add straight into it." />
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {categoryTotals.filter((c) => c.key !== "vehicle" && c.key !== "other").map((c, i) => (
-                  <button key={c.key} onClick={() => setReceiptCategoryFilter(c.key)} className="text-left">
-                    <Card className="p-4 h-full" delay={i * 40}>
-                      <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3" style={{ backgroundColor: TEAL_TINT }}><c.icon size={16} color={TEAL_DARK} /></div>
-                      <div className="text-sm font-semibold" style={{ color: NAVY }}>{c.label}</div>
-                      <div className="text-lg font-bold tabular mt-1" style={{ color: NAVY }}>{fmt(c.total)}</div>
-                      <div className="text-[11px] mt-0.5" style={{ color: "#8A93A3" }}>{c.count} receipt{c.count !== 1 ? "s" : ""}</div>
-                    </Card>
-                  </button>
-                ))}
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h1 className="text-2xl font-bold" style={{ color: NAVY }}>Deductions</h1>
+                  <p className="text-sm mt-1" style={{ color: "#8A93A3" }}>Track your claims and grow your refund</p>
+                </div>
+                <button
+                  onClick={() => setShowReceiptFilters((v) => !v)}
+                  className="w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 transition"
+                  style={showReceiptFilters ? { backgroundColor: TEAL_TINT, borderColor: TEAL_TINT, color: TEAL_DARK } : { borderColor: GREY_LINE, color: NAVY_SOFT }}
+                  aria-label="Filters"
+                >
+                  <SlidersHorizontal size={16} />
+                </button>
               </div>
 
-              <Card className="p-5">
-                <SectionTitle title="Your details" eyebrow="Used for your accountant summary" />
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label="Your name"><input disabled={demoMode} value={activeData.profile.name} onChange={(e) => setProfile("name", e.target.value)} placeholder="Optional" className={inputCls} /></Field>
-                  <Field label="Tax withheld ($)"><input disabled={demoMode} type="number" value={activeData.profile.taxWithheld} onChange={(e) => setProfile("taxWithheld", Number(e.target.value))} className={inputCls} /></Field>
+              <Card className="p-6">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium" style={{ color: "#8A93A3" }}>Total estimated deductions</span>
+                  {monthGrowthPct !== 0 && (
+                    <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: TEAL_TINT, color: TEAL_DARK }}>
+                      <TrendingUp size={11} style={monthGrowthPct < 0 ? { transform: "scaleY(-1)" } : undefined} />{monthGrowthPct > 0 ? "Up" : "Down"} {Math.abs(monthGrowthPct)}%
+                    </div>
+                  )}
+                </div>
+                <div className="text-4xl font-bold tabular mt-1" style={{ color: NAVY }}><AnimatedNumber value={totalDeductions} /></div>
+                {thisMonthDelta !== 0 && (
+                  <div className="flex items-center gap-1.5 mt-2 text-sm font-medium" style={{ color: TEAL_DARK }}>
+                    <TrendingUp size={13} style={thisMonthDelta < 0 ? { transform: "scaleY(-1)" } : undefined} />{thisMonthDelta > 0 ? "+" : "-"}{fmt(Math.abs(thisMonthDelta))} this month
+                  </div>
+                )}
+                <div className="text-xs mt-0.5" style={{ color: "#8A93A3" }}>Compared to last month</div>
+                <div className="mt-3 -mx-1">
+                  <TrendSparkline points={monthlyDeductionsTrend} color={TEAL} />
                 </div>
               </Card>
 
-              <Card className="p-5">
-                <SectionTitle title="Other common deductions" eyebrow="No receipts needed under ATO thresholds" />
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label={`Laundry & uniform estimate (up to $${LAUNDRY_ATO_CAP} without receipts)`}>
-                    <input disabled={demoMode} type="number" value={activeData.profile.laundryEstimate} onChange={(e) => setProfile("laundryEstimate", Number(e.target.value))} className={inputCls} />
-                  </Field>
-                  <Field label="Phone & internet work-use %">
-                    <input disabled={demoMode} type="number" min={0} max={100} value={activeData.profile.phoneWorkPct} onChange={(e) => setProfile("phoneWorkPct", Number(e.target.value))} className={inputCls} />
-                  </Field>
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-semibold" style={{ color: NAVY }}>By category</span>
+                  <button onClick={() => receiptsListRef.current?.scrollIntoView({ behavior: "smooth" })} className="text-xs font-semibold" style={{ color: TEAL_DARK }}>View all categories</button>
                 </div>
-                <p className="text-xs mt-3 leading-relaxed" style={{ color: "#8A93A3" }}>The ATO allows a reasonable estimate for laundering work uniforms without keeping receipts, up to ${LAUNDRY_ATO_CAP} a year. Your phone % should reflect genuine work use — check a typical bill if you're not sure.</p>
-              </Card>
+                <Card className="p-2">
+                  {deductionCategoryRows.map((row) => (
+                    <button key={row.key} onClick={row.onGo} className="w-full text-left px-3 py-3 flex items-center gap-3 border-b last:border-0 transition hover:bg-[#FBFBFC]" style={{ borderColor: GREY_LINE }}>
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL_TINT }}><row.icon size={16} color={TEAL_DARK} /></div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold" style={{ color: NAVY }}>{row.label}</div>
+                        <div className="text-xs mt-0.5" style={row.needsSetup ? { color: AMBER, fontWeight: 600 } : { color: "#8A93A3" }}>{row.sub}</div>
+                        <div className="mt-1.5 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "#EEF0F4" }}>
+                          <div className="h-full rounded-full" style={{ width: `${Math.min(100, (row.amount / maxCategoryRowAmount) * 100)}%`, backgroundColor: row.needsSetup ? "#D8DCE3" : TEAL }} />
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-sm font-bold tabular" style={{ color: NAVY }}>{fmt(row.amount)}</div>
+                        <div className="text-[11px]" style={{ color: "#8A93A3" }}>{totalDeductions > 0 ? Math.round((row.amount / totalDeductions) * 100) : 0}% of total</div>
+                      </div>
+                      <ChevronRight size={15} className="flex-shrink-0" style={{ color: "#B7BEC9" }} />
+                    </button>
+                  ))}
+                </Card>
+              </div>
+
+              {recentReceipts.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-semibold" style={{ color: NAVY }}>Recent receipts</span>
+                    <button onClick={() => receiptsListRef.current?.scrollIntoView({ behavior: "smooth" })} className="text-xs font-semibold" style={{ color: TEAL_DARK }}>View all receipts</button>
+                  </div>
+                  <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
+                    {recentReceipts.map((r) => {
+                      const cat = CATEGORIES.find((c) => c.key === r.category);
+                      return (
+                        <button key={r.id} onClick={() => setEditingReceipt(r)} className="flex-shrink-0 w-36 text-left">
+                          <Card className="p-3">
+                            <div className="w-full h-16 rounded-xl flex items-center justify-center mb-2" style={{ backgroundColor: TEAL_TINT }}>{cat && <cat.icon size={22} color={TEAL_DARK} />}</div>
+                            <div className="text-xs font-semibold truncate" style={{ color: NAVY }}>{r.vendor || "Untitled"}</div>
+                            <div className="text-[10px] mt-0.5" style={{ color: "#8A93A3" }}>{new Date(r.date).toLocaleDateString("en-AU", { day: "2-digit", month: "short" })}</div>
+                            {cat && <div className="mt-1.5"><Pill tone="teal">{cat.label}</Pill></div>}
+                            <div className="text-sm font-bold tabular mt-1.5" style={{ color: NAVY }}>{fmtDec(r.amount)}</div>
+                          </Card>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {todaySuggestion && (
+                <Card className="p-4 flex items-center gap-3">
+                  <Sparkles size={16} color={TEAL_DARK} className="flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#8A93A3" }}>TaxMate Insight</div>
+                    <div className="text-sm font-medium mt-0.5" style={{ color: NAVY }}>{todaySuggestion.text}</div>
+                  </div>
+                  <button onClick={todaySuggestion.action} disabled={demoMode} className="px-3.5 py-1.5 rounded-full text-xs font-semibold flex-shrink-0 disabled:opacity-50 transition hover:brightness-95" style={{ backgroundColor: TEAL_TINT, color: TEAL_DARK }}>
+                    Add now
+                  </button>
+                </Card>
+              )}
+
+              <div ref={deductionSettingsRef}>
+                <Disclosure title="Your details & other deductions">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <Field label="Your name"><input disabled={demoMode} value={activeData.profile.name} onChange={(e) => setProfile("name", e.target.value)} placeholder="Optional" className={inputCls} /></Field>
+                      <Field label="Tax withheld ($)"><input disabled={demoMode} type="number" value={activeData.profile.taxWithheld} onChange={(e) => setProfile("taxWithheld", Number(e.target.value))} className={inputCls} /></Field>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <Field label={`Laundry & uniform estimate (up to $${LAUNDRY_ATO_CAP} without receipts)`}>
+                        <input disabled={demoMode} type="number" value={activeData.profile.laundryEstimate} onChange={(e) => setProfile("laundryEstimate", Number(e.target.value))} className={inputCls} />
+                      </Field>
+                      <Field label="Phone & internet work-use %">
+                        <input disabled={demoMode} type="number" min={0} max={100} value={activeData.profile.phoneWorkPct} onChange={(e) => setProfile("phoneWorkPct", Number(e.target.value))} className={inputCls} />
+                      </Field>
+                    </div>
+                    <p className="text-xs leading-relaxed" style={{ color: "#8A93A3" }}>The ATO allows a reasonable estimate for laundering work uniforms without keeping receipts, up to ${LAUNDRY_ATO_CAP} a year. Your phone % should reflect genuine work use — check a typical bill if you're not sure.</p>
+                  </div>
+                </Disclosure>
+              </div>
 
               <Card className="p-2 sm:p-4">
-                <div className="flex items-center gap-2 flex-wrap px-2 pt-2 pb-3">
-                  <button onClick={() => setReceiptCategoryFilter("all")} className="px-3 py-1.5 rounded-full text-xs font-medium transition" style={receiptCategoryFilter === "all" ? { backgroundColor: NAVY, color: "#fff" } : { backgroundColor: "#F0F1F4", color: "#5B6472" }}>All work expenses</button>
-                  {CATEGORIES.filter((c) => c.key !== "vehicle").map((c) => (
-                    <button key={c.key} onClick={() => setReceiptCategoryFilter(c.key)} className="px-3 py-1.5 rounded-full text-xs font-medium transition" style={receiptCategoryFilter === c.key ? { backgroundColor: NAVY, color: "#fff" } : { backgroundColor: "#F0F1F4", color: "#5B6472" }}>{c.label}</button>
-                  ))}
-                </div>
+                <div ref={receiptsListRef} style={{ scrollMarginTop: "80px" }} />
+                {showReceiptFilters && (
+                  <div className="flex items-center gap-2 flex-wrap px-2 pt-2 pb-3">
+                    <button onClick={() => setReceiptCategoryFilter("all")} className="px-3 py-1.5 rounded-full text-xs font-medium transition" style={receiptCategoryFilter === "all" ? { backgroundColor: NAVY, color: "#fff" } : { backgroundColor: "#F0F1F4", color: "#5B6472" }}>All work expenses</button>
+                    {CATEGORIES.map((c) => (
+                      <button key={c.key} onClick={() => setReceiptCategoryFilter(c.key)} className="px-3 py-1.5 rounded-full text-xs font-medium transition" style={receiptCategoryFilter === c.key ? { backgroundColor: NAVY, color: "#fff" } : { backgroundColor: "#F0F1F4", color: "#5B6472" }}>{c.label}</button>
+                    ))}
+                  </div>
+                )}
                 <div className="px-2">
                   {filteredReceipts.filter((r) => receiptCategoryFilter !== "all" || r.category !== "vehicle").length === 0 ? (
                     <EmptyState icon={Wrench} title="Nothing here yet" subtitle="Tap the + button to scan a receipt straight into this category." />
