@@ -1,44 +1,77 @@
 import type { AppData } from "../types";
+import { supabase } from "./supabaseClient";
 
 /**
- * Storage layer for TaxMate Tradie.
+ * Storage layer for TaxMate Tradie. Every component only ever calls
+ * loadData()/saveData() — this is the one place that knows how data is
+ * actually persisted.
  *
- * Today this reads/writes browser localStorage. When you're ready to
- * connect Supabase, replace the two functions below with Supabase
- * calls (e.g. `supabase.from('app_data').select()` /
- * `.upsert()` keyed by user id) — nothing else in the app needs to
- * change, since every component only ever calls loadData()/saveData().
+ * Data lives in Supabase (table `app_data`, one row per user, protected by
+ * row-level security — see supabase/schema.sql). The old localStorage key is
+ * still checked once on first login so existing local data isn't lost when
+ * an account is created — see migrateLocalDataIfAny().
  */
 
-const STORAGE_KEY = "taxmate-tradie-data";
+const LOCAL_STORAGE_KEY = "taxmate-tradie-data";
 
-export async function loadData(defaults: AppData): Promise<AppData> {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      return {
-        ...defaults,
-        ...parsed,
-        profile: {
-          ...defaults.profile,
-          ...(parsed.profile || {}),
-          vehicle: {
-            ...defaults.profile.vehicle,
-            ...((parsed.profile && parsed.profile.vehicle) || {}),
-          },
-        },
-      };
-    }
-  } catch (e) {
-    console.error("Failed to load TaxMate Tradie data", e);
-  }
-  return defaults;
+function mergeWithDefaults(defaults: AppData, parsed: Partial<AppData>): AppData {
+  return {
+    ...defaults,
+    ...parsed,
+    profile: {
+      ...defaults.profile,
+      ...(parsed.profile || {}),
+      vehicle: {
+        ...defaults.profile.vehicle,
+        ...((parsed.profile && parsed.profile.vehicle) || {}),
+      },
+    },
+  };
 }
 
-export async function saveData(data: AppData): Promise<void> {
+async function migrateLocalDataIfAny(defaults: AppData, userId: string): Promise<AppData | null> {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const merged = mergeWithDefaults(defaults, parsed);
+    await saveData(merged, userId);
+    window.localStorage.removeItem(LOCAL_STORAGE_KEY);
+    return merged;
+  } catch (e) {
+    console.error("Failed to migrate local TaxMate data", e);
+    return null;
+  }
+}
+
+export async function loadData(defaults: AppData, userId: string): Promise<AppData> {
+  if (!supabase) return defaults;
+  try {
+    const { data, error } = await supabase
+      .from("app_data")
+      .select("payload")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) throw error;
+
+    if (!data) {
+      const migrated = await migrateLocalDataIfAny(defaults, userId);
+      return migrated || defaults;
+    }
+    return mergeWithDefaults(defaults, (data.payload as Partial<AppData>) || {});
+  } catch (e) {
+    console.error("Failed to load TaxMate Tradie data", e);
+    return defaults;
+  }
+}
+
+export async function saveData(data: AppData, userId: string): Promise<void> {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase
+      .from("app_data")
+      .upsert({ user_id: userId, payload: data, updated_at: new Date().toISOString() });
+    if (error) throw error;
   } catch (e) {
     console.error("Failed to save TaxMate Tradie data", e);
   }
@@ -59,26 +92,3 @@ export function saveDemoFlag(on: boolean): void {
     window.localStorage.setItem(DEMO_KEY, on ? "1" : "0");
   } catch (e) {}
 }
-
-/* ---------------------------------------------------------------
-   Future Supabase sketch (kept here for when you're ready):
-
-   import { createClient } from "@supabase/supabase-js";
-   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-   export async function loadData(defaults: AppData, userId: string) {
-     const { data, error } = await supabase
-       .from("app_data")
-       .select("payload")
-       .eq("user_id", userId)
-       .single();
-     if (error || !data) return defaults;
-     return { ...defaults, ...data.payload };
-   }
-
-   export async function saveData(data: AppData, userId: string) {
-     await supabase
-       .from("app_data")
-       .upsert({ user_id: userId, payload: data });
-   }
----------------------------------------------------------------- */

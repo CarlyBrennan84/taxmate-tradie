@@ -4,10 +4,12 @@ import {
   GraduationCap, FileText, Plus, Trash2, ChevronRight, Menu,
   Download, Printer, TrendingUp, Gauge, MapPin, Sparkles, Camera,
   Check, CheckCircle2, AlertTriangle, Fuel, Upload, ShieldCheck, X,
-  Search, SlidersHorizontal, Send, Mic,
+  Search, SlidersHorizontal, Send, Mic, LogOut,
 } from "lucide-react";
+import type { Session } from "@supabase/supabase-js";
 import type { AppData, Receipt as ReceiptT, Trip, CategoryKey } from "./types";
 import { loadData, saveData, loadDemoFlag, saveDemoFlag } from "./lib/storage";
+import { supabase, arrivedViaInviteOrRecovery } from "./lib/supabaseClient";
 import { SAMPLE_DATA } from "./sampleData";
 import { parseDriversnoteCSV } from "./csv";
 
@@ -705,11 +707,101 @@ function MethodCompareCard({ centsPerKmEstimate, logbookEstimate, logbookReady, 
 }
 
 /* =================================================================
+   AUTH
+==================================================================*/
+function AuthLogo() {
+  return (
+    <div className="flex items-center gap-2 justify-center mb-8">
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: NAVY }}><Gauge size={20} color={TEAL} /></div>
+      <span className="text-lg font-bold" style={{ color: NAVY }}>TaxMate Tradie</span>
+    </div>
+  );
+}
+
+function ConfigMissingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: GREY_BG }}>
+      <div className="w-full max-w-sm text-center">
+        <AuthLogo />
+        <Card className="p-6">
+          <p className="text-sm" style={{ color: NAVY }}>Accounts aren't set up yet — <code className="text-xs">VITE_SUPABASE_URL</code> and <code className="text-xs">VITE_SUPABASE_ANON_KEY</code> are missing from this build.</p>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function AuthScreen({ needsPasswordSetup, onPasswordSet }: { needsPasswordSetup: boolean; onPasswordSet: () => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    if (!supabase || loading) return;
+    setLoading(true);
+    setError("");
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    if (error) setError(error.message);
+    setLoading(false);
+  };
+
+  const handleSetPassword = async () => {
+    if (!supabase || loading) return;
+    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
+    setLoading(true);
+    setError("");
+    const { error } = await supabase.auth.updateUser({ password });
+    setLoading(false);
+    if (error) { setError(error.message); return; }
+    onPasswordSet();
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: GREY_BG }}>
+      <div className="w-full max-w-sm">
+        <AuthLogo />
+        <Card className="p-6">
+          {needsPasswordSetup ? (
+            <>
+              <h1 className="text-lg font-bold mb-1" style={{ color: NAVY }}>Welcome — set your password</h1>
+              <p className="text-sm mb-4" style={{ color: "#8A93A3" }}>Choose a password to finish setting up your account.</p>
+              <Field label="New password">
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSetPassword()} placeholder="At least 8 characters" className={inputCls} />
+              </Field>
+              {error && <p className="text-xs mt-2" style={{ color: "#C4573F" }}>{error}</p>}
+              <button onClick={handleSetPassword} disabled={loading || !password} className="w-full mt-4 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition hover:brightness-110" style={{ backgroundColor: TEAL }}>
+                {loading ? "Saving…" : "Save password & continue"}
+              </button>
+            </>
+          ) : (
+            <>
+              <h1 className="text-lg font-bold mb-1" style={{ color: NAVY }}>Log in</h1>
+              <p className="text-sm mb-4" style={{ color: "#8A93A3" }}>Accounts are invite-only — ask for an invite if you don't have one yet.</p>
+              <div className="space-y-3">
+                <Field label="Email"><input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleLogin()} className={inputCls} /></Field>
+                <Field label="Password"><input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleLogin()} className={inputCls} /></Field>
+              </div>
+              {error && <p className="text-xs mt-2" style={{ color: "#C4573F" }}>{error}</p>}
+              <button onClick={handleLogin} disabled={loading || !email || !password} className="w-full mt-4 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition hover:brightness-110" style={{ backgroundColor: TEAL }}>
+                {loading ? "Logging in…" : "Log in"}
+              </button>
+            </>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* =================================================================
    MAIN APP
 ==================================================================*/
 type TabKey = "overview" | "vehicle" | "expenses" | "progress" | "summary";
 
 export default function App() {
+  const [session, setSession] = useState<Session | null | undefined>(undefined); // undefined = still checking
+  const [needsPasswordSetup, setNeedsPasswordSetup] = useState<boolean>(arrivedViaInviteOrRecovery);
   const [data, setData] = useState<AppData | null>(null);
   const [tab, setTab] = useState<TabKey>("overview");
   const [mobileNav, setMobileNav] = useState(false);
@@ -731,9 +823,52 @@ export default function App() {
   const [assistantLoading, setAssistantLoading] = useState(false);
   const csvInputRef = useRef<HTMLInputElement>(null);
   const receiptInputRef = useRef<HTMLInputElement>(null);
+  const saveTimerRef = useRef<number | null>(null);
 
-  useEffect(() => { loadData(DEFAULT_DATA).then(setData); }, []);
-  useEffect(() => { if (data && !demoMode) saveData(data); }, [data, demoMode]);
+  useEffect(() => {
+    if (!supabase) { setSession(null); return; }
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => setSession(newSession));
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    loadData(DEFAULT_DATA, session.user.id).then(setData);
+  }, [session?.user.id]);
+
+  useEffect(() => {
+    if (!data || !session || demoMode) return;
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(() => { saveData(data, session.user.id); }, 800);
+    return () => { if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current); };
+  }, [data, demoMode, session]);
+
+  const handleLogout = async () => { if (supabase) await supabase.auth.signOut(); };
+
+  if (!supabase) {
+    return <ConfigMissingScreen />;
+  }
+
+  if (session === undefined) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: GREY_BG }}>
+        <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: TEAL, borderTopColor: "transparent" }} />
+      </div>
+    );
+  }
+
+  if (!session || needsPasswordSetup) {
+    return (
+      <AuthScreen
+        needsPasswordSetup={!!session && needsPasswordSetup}
+        onPasswordSet={() => {
+          window.history.replaceState(null, "", window.location.pathname);
+          setNeedsPasswordSetup(false);
+        }}
+      />
+    );
+  }
 
   if (!data) {
     return (
@@ -1088,9 +1223,12 @@ export default function App() {
               </button>
             ))}
           </nav>
-          <div className="mt-auto pt-6 space-y-3">
+          <div className="mt-auto pt-6 space-y-2">
             <button onClick={demoMode ? disableDemo : enableDemo} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold border transition" style={demoMode ? { backgroundColor: AMBER_TINT, borderColor: AMBER_TINT, color: "#8A5A0F" } : { borderColor: GREY_LINE, color: NAVY_SOFT }}>
               {demoMode ? <><X size={13} /> Clear demo data</> : <><Sparkles size={13} /> View sample apprentice data</>}
+            </button>
+            <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold border transition" style={{ borderColor: GREY_LINE, color: NAVY_SOFT }}>
+              <LogOut size={13} /> Log out
             </button>
           </div>
         </aside>
@@ -1111,6 +1249,9 @@ export default function App() {
             ))}
             <button onClick={() => { demoMode ? disableDemo() : enableDemo(); setMobileNav(false); }} className="col-span-3 mt-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold border" style={demoMode ? { backgroundColor: AMBER_TINT, borderColor: AMBER_TINT, color: "#8A5A0F" } : { borderColor: GREY_LINE, color: NAVY_SOFT }}>
               {demoMode ? <><X size={13} /> Clear demo data</> : <><Sparkles size={13} /> View sample apprentice data</>}
+            </button>
+            <button onClick={() => { handleLogout(); setMobileNav(false); }} className="col-span-3 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold border" style={{ borderColor: GREY_LINE, color: NAVY_SOFT }}>
+              <LogOut size={13} /> Log out
             </button>
           </div>
         )}
