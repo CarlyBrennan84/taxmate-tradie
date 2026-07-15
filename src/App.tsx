@@ -5,6 +5,7 @@ import {
   Download, Printer, TrendingUp, Gauge, MapPin, Sparkles, Camera,
   Check, CheckCircle2, AlertTriangle, Fuel, Upload, ShieldCheck, X,
   Search, SlidersHorizontal, Send, Mic, LogOut, Landmark,
+  Info, Wallet, Bell, MoreHorizontal,
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import type { AppData, Receipt as ReceiptT, Trip, CategoryKey, Profile } from "./types";
@@ -210,6 +211,28 @@ export function EmptyState({ icon: Icon, title, subtitle, action }: { icon: Reac
       <p className="text-sm font-semibold" style={{ color: NAVY }}>{title}</p>
       <p className="text-xs mt-1 max-w-[280px] leading-relaxed" style={{ color: "#8A93A3" }}>{subtitle}</p>
       {action && <div className="mt-4">{action}</div>}
+    </div>
+  );
+}
+
+function RadialProgress({ pct, label, size = 88 }: { pct: number; label: string; size?: number }) {
+  const stroke = 7;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const clamped = Math.max(0, Math.min(1, pct));
+  return (
+    <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth={stroke} />
+        <circle
+          cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#fff" strokeWidth={stroke} strokeLinecap="round"
+          strokeDasharray={c} strokeDashoffset={c * (1 - clamped)} style={{ transition: "stroke-dashoffset 700ms ease" }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-base font-bold text-white tabular">{Math.round(clamped * 100)}%</span>
+      </div>
+      <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-medium text-white/80 whitespace-nowrap">{label}</div>
     </div>
   );
 }
@@ -1197,14 +1220,20 @@ export default function App() {
   const accountantReady = receiptsWithNum.length > 0 && receiptsFiledPct === 100 && missingDetailsCount === 0 && vehicleEvidenceComplete && laundryAdded && phonePctAdded && income > 0;
 
   const readinessChecks = [
-    { key: "filed", ok: receiptsWithNum.length > 0 && receiptsFiledPct === 100, title: "Receipts saved", detail: receiptsWithNum.length ? `${receiptsFiledPct}% of ${receiptsWithNum.length} receipts marked as filed` : "No receipts logged yet", cta: "Review receipts", onGo: () => setTab("progress") },
-    { key: "missing", ok: missingDetailsCount === 0, title: "Missing receipt details", detail: missingDetailsCount ? `${missingDetailsCount} receipt(s) still need a vendor or amount` : "All receipts have complete details", cta: "Fix details", onGo: () => setTab("progress") },
-    { key: "vehicle", ok: vehicleEvidenceComplete, title: "Vehicle evidence complete", detail: vehicleEvidenceComplete ? "12-week logbook complete with business km logged" : `${Math.min(daysElapsed, 84)}/84 days of your logbook done`, cta: "Go to logbook", onGo: () => setTab("vehicle") },
-    { key: "laundry", ok: laundryAdded, title: "Laundry estimate added", detail: laundryAdded ? `${fmt(laundryEstimate)} claimed for uniform laundering` : "Add an estimate for washing your work uniform", cta: "Add estimate", onGo: () => setTab("expenses") },
-    { key: "phone", ok: phonePctAdded, title: "Phone work-use % added", detail: phonePctAdded ? `${activeData.profile.phoneWorkPct}% of your phone bill claimed as work use` : "Set what % of your phone use is for work", cta: "Add %", onGo: () => setTab("expenses") },
-    { key: "accountant", ok: accountantReady, title: "Accountant summary ready", detail: accountantReady ? "Everything's in good shape for tax time" : "A few things above still need attention before your pack is complete", cta: "View pack", onGo: () => setTab("summary") },
+    { key: "filed", icon: Receipt, ok: receiptsWithNum.length > 0 && receiptsFiledPct === 100, title: "Receipts saved", detail: receiptsWithNum.length ? `${receiptsFiledPct}% of ${receiptsWithNum.length} receipts marked as filed` : "No receipts logged yet", cta: "Review receipts", onGo: () => setTab("progress") },
+    { key: "missing", icon: AlertTriangle, ok: missingDetailsCount === 0, title: "Missing receipt details", detail: missingDetailsCount ? `${missingDetailsCount} receipt(s) still need a vendor or amount` : "All receipts have complete details", cta: "Fix details", onGo: () => setTab("progress") },
+    { key: "vehicle", icon: Car, ok: vehicleEvidenceComplete, title: "Vehicle evidence complete", detail: vehicleEvidenceComplete ? "12-week logbook complete with business km logged" : `${Math.min(daysElapsed, 84)}/84 days of your logbook done`, cta: "Go to logbook", onGo: () => setTab("vehicle") },
+    { key: "laundry", icon: Shirt, ok: laundryAdded, title: "Laundry estimate added", detail: laundryAdded ? `${fmt(laundryEstimate)} claimed for uniform laundering` : "Add an estimate for washing your work uniform", cta: "Add estimate", onGo: () => setTab("expenses") },
+    { key: "phone", icon: Smartphone, ok: phonePctAdded, title: "Phone work-use % added", detail: phonePctAdded ? `${activeData.profile.phoneWorkPct}% of your phone bill claimed as work use` : "Set what % of your phone use is for work", cta: "Add %", onGo: () => setTab("expenses") },
+    { key: "accountant", icon: FileText, ok: accountantReady, title: "Accountant summary ready", detail: accountantReady ? "Everything's in good shape for tax time" : "A few things above still need attention before your pack is complete", cta: "View pack", onGo: () => setTab("summary") },
   ];
   const readinessScore = readinessChecks.filter((c) => c.ok).length;
+  const readyPct = readinessChecks.length ? readinessScore / readinessChecks.length : 0;
+  const todaysTasks = readinessChecks.filter((c) => !c.ok && c.key !== "accountant").slice(0, 3);
+  const laundryOpportunity = laundryAdded ? 0 : LAUNDRY_ATO_CAP;
+  const laundryTaxBenefit = laundryOpportunity > 0 ? taxAfter - totalTax(Math.max(0, income - totalDeductions - laundryOpportunity)) : 0;
+  const greetingHour = new Date().getHours();
+  const greeting = greetingHour < 12 ? "Good morning" : greetingHour < 18 ? "Good afternoon" : "Good evening";
 
   const weeklyDeductionsTrend = (() => {
     const weeks = 8;
@@ -1250,7 +1279,7 @@ export default function App() {
   };
 
   const NAV: { key: TabKey; label: string; icon: React.ElementType }[] = [
-    { key: "overview", label: "Home", icon: LayoutDashboard },
+    { key: "overview", label: "Today", icon: LayoutDashboard },
     { key: "vehicle", label: "Logbook", icon: Car },
     { key: "expenses", label: "Deductions", icon: Wrench },
     { key: "benefits", label: "Benefits", icon: Landmark },
@@ -1307,21 +1336,24 @@ export default function App() {
             <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: NAVY }}><Gauge size={14} color={TEAL} /></div>
             <span className="text-sm font-bold" style={{ color: NAVY }}>TaxMate Tradie</span>
           </div>
-          <button onClick={() => setMobileNav((v) => !v)} className="p-2 rounded-lg" style={{ color: NAVY }}><Menu size={20} /></button>
+          <div className="relative p-2" aria-hidden="true"><Bell size={19} color={NAVY} /><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ backgroundColor: "#D64545" }} /></div>
         </div>
         {mobileNav && (
-          <div className="lg:hidden fixed top-[52px] left-0 right-0 z-30 bg-white border-b px-4 py-3 grid grid-cols-3 gap-2" style={{ borderColor: GREY_LINE }}>
-            {NAV.map((n) => (
-              <button key={n.key} onClick={() => { setTab(n.key); setMobileNav(false); }} className="flex flex-col items-center gap-1 py-2.5 rounded-xl text-[11px] font-medium text-center leading-tight" style={tab === n.key ? { backgroundColor: TEAL_TINT, color: TEAL_DARK } : { color: "#5B6472" }}>
-                <n.icon size={17} />{n.label}
+          <div className="lg:hidden fixed bottom-[64px] left-0 right-0 z-30 bg-white border-t px-4 py-3 space-y-1 rounded-t-2xl shadow-card-hover" style={{ borderColor: GREY_LINE }}>
+            <button onClick={() => { setTab("progress"); setMobileNav(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium" style={tab === "progress" ? { backgroundColor: TEAL_TINT, color: TEAL_DARK } : { color: "#5B6472" }}>
+              <ShieldCheck size={17} />Progress
+            </button>
+            <button onClick={() => { setTab("summary"); setMobileNav(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium" style={tab === "summary" ? { backgroundColor: TEAL_TINT, color: TEAL_DARK } : { color: "#5B6472" }}>
+              <FileText size={17} />Accountant Pack
+            </button>
+            <div className="pt-2 mt-1 space-y-2" style={{ borderTop: "1px solid " + GREY_LINE }}>
+              <button onClick={() => { demoMode ? disableDemo() : enableDemo(); setMobileNav(false); }} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold border" style={demoMode ? { backgroundColor: AMBER_TINT, borderColor: AMBER_TINT, color: "#8A5A0F" } : { borderColor: GREY_LINE, color: NAVY_SOFT }}>
+                {demoMode ? <><X size={13} /> Clear demo data</> : <><Sparkles size={13} /> View sample apprentice data</>}
               </button>
-            ))}
-            <button onClick={() => { demoMode ? disableDemo() : enableDemo(); setMobileNav(false); }} className="col-span-3 mt-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold border" style={demoMode ? { backgroundColor: AMBER_TINT, borderColor: AMBER_TINT, color: "#8A5A0F" } : { borderColor: GREY_LINE, color: NAVY_SOFT }}>
-              {demoMode ? <><X size={13} /> Clear demo data</> : <><Sparkles size={13} /> View sample apprentice data</>}
-            </button>
-            <button onClick={() => { handleLogout(); setMobileNav(false); }} className="col-span-3 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold border" style={{ borderColor: GREY_LINE, color: NAVY_SOFT }}>
-              <LogOut size={13} /> Log out
-            </button>
+              <button onClick={() => { handleLogout(); setMobileNav(false); }} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold border" style={{ borderColor: GREY_LINE, color: NAVY_SOFT }}>
+                <LogOut size={13} /> Log out
+              </button>
+            </div>
           </div>
         )}
 
@@ -1335,12 +1367,9 @@ export default function App() {
 
           {tab === "overview" && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div>
-                  <h1 className="text-2xl font-bold" style={{ color: NAVY }}>G'day{activeData.profile.name ? `, ${activeData.profile.name}` : ""} 👋</h1>
-                  <p className="text-sm mt-1" style={{ color: "#8A93A3" }}>{activeData.profile.occupation} · {activeData.profile.fy}</p>
-                </div>
-                <Pill tone={unfiledCount > 0 ? "amber" : "teal"}>{unfiledCount > 0 ? `${unfiledCount} receipts to file` : receiptsWithNum.length ? "All receipts filed" : "No receipts yet"}</Pill>
+              <div>
+                <h1 className="text-2xl font-bold" style={{ color: NAVY }}>{greeting}{activeData.profile.name ? `, ${activeData.profile.name}` : ""} 👋</h1>
+                <p className="text-sm mt-1" style={{ color: "#8A93A3" }}>{estimatedRefund > 0 ? "You're on track to save" : `${activeData.profile.occupation} · ${activeData.profile.fy}`}</p>
               </div>
 
               {!activeData.profile.quickSetupDone ? (
@@ -1352,64 +1381,99 @@ export default function App() {
                 />
               ) : (
                 <div className="rounded-3xl p-6 fade-up" style={{ background: `linear-gradient(135deg, ${NAVY} 0%, ${TEAL_DARK} 100%)` }}>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-white/70">Estimated Refund</div>
-                  <div className="text-4xl font-bold tabular mt-1 text-white"><AnimatedNumber value={Math.max(0, estimatedRefund)} /></div>
-                  {weeklyDelta > 0 && (
-                    <div className="inline-flex items-center gap-1 mt-3 px-3 py-1 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: "rgba(255,255,255,0.18)" }}>
-                      <TrendingUp size={12} /> {fmt(weeklyDelta)} this week
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-white/70">
+                        Estimated Tax Position <Info size={12} />
+                      </div>
+                      <div className="text-xs mt-2 text-white/70">Estimated refund</div>
+                      <div className="text-4xl font-bold tabular mt-0.5 text-white"><AnimatedNumber value={Math.max(0, estimatedRefund)} /></div>
+                      {weeklyDelta > 0 && (
+                        <div className="inline-flex items-center gap-1 mt-3 px-3 py-1 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: "rgba(255,255,255,0.18)" }}>
+                          <TrendingUp size={12} /> {fmt(weeklyDelta)} this month
+                        </div>
+                      )}
                     </div>
-                  )}
+                    <div className="pt-2 pb-3"><RadialProgress pct={readyPct} label="Tax Ready" /></div>
+                  </div>
                   <div className="mt-3 -mx-1">
                     <TrendSparkline points={weeklyDeductionsTrend} color="#5EEAD4" />
+                  </div>
+                  <div className="mt-5 pt-4 grid grid-cols-4 gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.15)" }}>
+                    {[
+                      { icon: Wallet, label: "Income", value: fmt(income) },
+                      { icon: Landmark, label: "Tax withheld", value: fmt(withheld) },
+                      { icon: Wallet, label: "Current deductions", value: fmt(totalDeductions) },
+                      { icon: Car, label: "Vehicle method", value: "Logbook" },
+                    ].map((s) => (
+                      <div key={s.label} className="flex flex-col items-center text-center gap-1.5">
+                        <s.icon size={15} className="text-white/60" />
+                        <div className="text-[10px] leading-tight text-white/60">{s.label}</div>
+                        <div className="text-xs font-semibold tabular text-white">{s.value}</div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <button onClick={quickUploadReceipt} disabled={demoMode} className="flex flex-col items-center justify-center gap-2 py-6 rounded-2xl text-white font-semibold shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ backgroundColor: TEAL }}>
-                  <Camera size={22} />
-                  Scan Receipt
-                </button>
-                <button onClick={quickLogTravel} disabled={demoMode} className="flex flex-col items-center justify-center gap-2 py-6 rounded-2xl font-semibold border bg-white shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ borderColor: GREY_LINE, color: NAVY }}>
-                  <Car size={22} color={TEAL_DARK} />
-                  Log Trip
-                </button>
-              </div>
-              <button onClick={() => setTab("progress")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold border bg-white transition hover:brightness-95" style={{ borderColor: GREY_LINE, color: NAVY }}>
-                <ShieldCheck size={16} color={TEAL_DARK} />
-                View Progress
-              </button>
+              {todaysTasks.length > 0 && (
+                <Card className="p-5">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-semibold" style={{ color: NAVY }}>Today's Tasks</span>
+                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ backgroundColor: TEAL_TINT, color: TEAL_DARK }}>{todaysTasks.length}</span>
+                  </div>
+                  <div className="divide-y" style={{ borderColor: GREY_LINE }}>
+                    {todaysTasks.map((t) => (
+                      <button key={t.key} onClick={t.onGo} disabled={demoMode} className="w-full flex items-center gap-3 py-3 text-left disabled:opacity-50 disabled:cursor-not-allowed group">
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL_TINT }}>
+                          <t.icon size={16} color={TEAL_DARK} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold" style={{ color: NAVY }}>{t.title}</div>
+                          <div className="text-xs mt-0.5 truncate" style={{ color: "#8A93A3" }}>{t.detail}</div>
+                        </div>
+                        <ChevronRight size={16} className="flex-shrink-0" style={{ color: "#B7BEC9" }} />
+                      </button>
+                    ))}
+                  </div>
+                  {laundryTaxBenefit > 0 && (
+                    <div className="flex items-center justify-between pt-3 mt-1" style={{ borderTop: "1px solid " + GREY_LINE }}>
+                      <span className="text-xs font-semibold" style={{ color: NAVY_SOFT }}>Estimated tax benefit today</span>
+                      <span className="text-sm font-bold tabular" style={{ color: TEAL_DARK }}>+{fmt(laundryTaxBenefit)}</span>
+                    </div>
+                  )}
+                </Card>
+              )}
 
               {todaySuggestion && (
                 <Card className="p-4 flex items-center gap-3">
                   <Sparkles size={16} color={TEAL_DARK} className="flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#8A93A3" }}>Today's suggestion</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#8A93A3" }}>TaxMate Insight</div>
                     <div className="text-sm font-medium mt-0.5" style={{ color: NAVY }}>{todaySuggestion.text}</div>
                   </div>
-                  <button onClick={todaySuggestion.action} disabled={demoMode} className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-white disabled:opacity-50 transition hover:brightness-110" style={{ backgroundColor: TEAL }}>
-                    <Plus size={16} />
+                  <button onClick={todaySuggestion.action} disabled={demoMode} className="px-3.5 py-1.5 rounded-full text-xs font-semibold flex-shrink-0 disabled:opacity-50 transition hover:brightness-95" style={{ backgroundColor: TEAL_TINT, color: TEAL_DARK }}>
+                    Add now
                   </button>
                 </Card>
               )}
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Card className="p-4 text-center" delay={60}>
-                  <div className="text-xl font-bold tabular" style={{ color: NAVY }}>{receiptsWithNum.length}</div>
-                  <div className="text-[11px] mt-1" style={{ color: "#8A93A3" }}>Receipts logged</div>
-                </Card>
-                <Card className="p-4 text-center" delay={100}>
-                  <div className="text-xl font-bold tabular" style={{ color: NAVY }}>{trips.length}</div>
-                  <div className="text-[11px] mt-1" style={{ color: "#8A93A3" }}>Trips logged</div>
-                </Card>
-                <Card className="p-4 text-center" delay={140}>
-                  <div className="text-xl font-bold tabular" style={{ color: NAVY }}><AnimatedNumber value={totalDeductions} /></div>
-                  <div className="text-[11px] mt-1" style={{ color: "#8A93A3" }}>Est. deductions</div>
-                </Card>
-                <Card className="p-4 text-center" delay={180}>
-                  <div className="text-xl font-bold tabular" style={{ color: NAVY }}>{Math.round(logbookProgress * 100)}%</div>
-                  <div className="text-[11px] mt-1" style={{ color: "#8A93A3" }}>Logbook</div>
-                </Card>
+              <div>
+                <div className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Quick actions</div>
+                <div className="grid grid-cols-3 gap-3">
+                  <button onClick={quickUploadReceipt} disabled={demoMode} className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-white border shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ borderColor: GREY_LINE }}>
+                    <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: NAVY }}><Camera size={18} color="#fff" /></div>
+                    <span className="text-xs font-semibold" style={{ color: NAVY }}>Scan Receipt</span>
+                  </button>
+                  <button onClick={quickLogTravel} disabled={demoMode} className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-white border shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ borderColor: GREY_LINE }}>
+                    <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: NAVY }}><Car size={18} color="#fff" /></div>
+                    <span className="text-xs font-semibold" style={{ color: NAVY }}>Log Trip</span>
+                  </button>
+                  <button onClick={() => setAssistantOpen(true)} disabled={demoMode || !ASSISTANT_URL} className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-white border shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ borderColor: GREY_LINE }}>
+                    <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: NAVY }}><Mic size={18} color="#fff" /></div>
+                    <span className="text-xs font-semibold" style={{ color: NAVY }}>Ask TaxMate</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -1419,7 +1483,6 @@ export default function App() {
               <SectionTitle title="Progress" />
 
               {(() => {
-                const readyPct = readinessChecks.length ? readinessScore / readinessChecks.length : 0;
                 const readyMessage = readyPct >= 0.8 ? "You're almost there! 🎉" : readyPct >= 0.4 ? "You're making great progress! 🎉" : "Let's get your claim sorted.";
                 return (
                   <div className="rounded-3xl p-6 fade-up text-white" style={{ background: `linear-gradient(135deg, ${NAVY} 0%, ${TEAL_DARK} 100%)` }}>
@@ -1756,11 +1819,14 @@ export default function App() {
       </div>
 
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t px-2 py-1.5 flex justify-around print:hidden" style={{ borderColor: GREY_LINE }}>
-        {NAV.slice(0, 5).map((n) => (
+        {NAV.filter((n) => n.key !== "progress").map((n) => (
           <button key={n.key} onClick={() => setTab(n.key)} className="flex flex-col items-center gap-0.5 py-1.5 px-1 rounded-xl flex-1" style={tab === n.key ? { color: TEAL_DARK } : { color: "#B7BEC9" }}>
             <n.icon size={19} /><span className="text-[9.5px] font-medium text-center leading-tight">{n.label}</span>
           </button>
         ))}
+        <button onClick={() => setMobileNav((v) => !v)} className="flex flex-col items-center gap-0.5 py-1.5 px-1 rounded-xl flex-1" style={mobileNav || tab === "progress" || tab === "summary" ? { color: TEAL_DARK } : { color: "#B7BEC9" }}>
+          <MoreHorizontal size={19} /><span className="text-[9.5px] font-medium text-center leading-tight">More</span>
+        </button>
       </div>
 
       {(showReceiptForm || editingReceipt) && !demoMode && (
