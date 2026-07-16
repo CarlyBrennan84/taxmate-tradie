@@ -20,9 +20,12 @@ import gloveboxLogo from "./assets/glovebox-logo.png";
 ----------------------------------------------------------------*/
 export const NAVY = "#010818";
 export const NAVY_SOFT = "#3A4A66";
-export const TEAL = "#2A63E5";
+export const TEAL = "#2563FF";
 export const TEAL_DARK = "#1E4FBE";
 export const TEAL_TINT = "#E9EFFE";
+export const GREEN = "#18C37E";
+export const GREEN_DARK = "#0E7A52";
+export const GREEN_TINT = "#E4F9F0";
 const GREY_BG = "#F6F7F9";
 export const GREY_LINE = "#E7E9EE";
 export const AMBER = "#C77F1A";
@@ -1424,35 +1427,48 @@ export default function App() {
           {tab === "overview" && (
             <div className="space-y-6">
               <div className="rounded-b-3xl lg:rounded-3xl -mx-4 sm:-mx-6 lg:mx-0 -mt-[68px] lg:mt-0 px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-6 fade-up" style={{ backgroundColor: NAVY }}>
-                <div className="lg:hidden relative flex items-center justify-center mb-5">
-                  <img src={gloveboxLogo} alt="Glovebox" className="w-[70%] max-w-[280px] h-auto" />
-                  <div className="absolute right-0 top-1/2 -translate-y-1/2 p-2" aria-hidden="true">
+                <div className="lg:hidden flex items-center justify-between mb-5">
+                  <img src={gloveboxLogo} alt="Glovebox" className="h-9 w-auto" />
+                  <div className="relative p-2" aria-hidden="true">
                     <Bell size={20} color="#fff" />
                     <span className="absolute top-2 right-2 w-2 h-2 rounded-full" style={{ backgroundColor: "#D64545" }} />
                   </div>
                 </div>
                 <h1 className="text-2xl font-bold text-white">{greeting}{activeData.profile.name ? `, ${activeData.profile.name}` : ""} 👋</h1>
                 <p className="text-sm mt-1 text-white/70">{estimatedRefund > 0 ? "You're on track to save" : `${activeData.profile.occupation} · ${activeData.profile.fy}`}</p>
-                <div className="grid grid-cols-3 gap-2 mt-5">
-                  <button onClick={quickUploadReceipt} className="flex items-center gap-2 rounded-2xl p-3 text-left transition hover:brightness-110" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}><Camera size={16} color="#fff" /></div>
+                <div className="grid grid-cols-3 gap-3 mt-5">
+                  <button
+                    onClick={quickUploadReceipt}
+                    className="flex flex-col items-start justify-center gap-2 rounded-[18px] px-3 py-3.5 text-left transition active:scale-[0.98]"
+                    style={{ backgroundColor: "#14233A", border: "1px solid rgba(255,255,255,0.10)" }}
+                  >
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}><Camera size={18} color="#fff" /></div>
                     <div className="min-w-0">
-                      <div className="text-xs font-semibold text-white truncate">Scan Receipt</div>
-                      <div className="text-[10px] text-white/60 truncate">Snap & save</div>
+                      <div className="text-xs font-semibold text-white leading-tight">Scan Receipt</div>
+                      <div className="text-[11px] mt-0.5 leading-tight" style={{ color: "#AAB7CA" }}>Snap & save</div>
                     </div>
                   </button>
-                  <button onClick={quickLogTravel} className="flex items-center gap-2 rounded-2xl p-3 text-left transition hover:brightness-110" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}><Car size={16} color="#fff" /></div>
+                  <button
+                    onClick={quickLogTravel}
+                    className="flex flex-col items-start justify-center gap-2 rounded-[18px] px-3 py-3.5 text-left transition active:scale-[0.98]"
+                    style={{ backgroundColor: "#14233A", border: "1px solid rgba(255,255,255,0.10)" }}
+                  >
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}><Car size={18} color="#fff" /></div>
                     <div className="min-w-0">
-                      <div className="text-xs font-semibold text-white truncate">Log Trip</div>
-                      <div className="text-[10px] text-white/60 truncate">Track km</div>
+                      <div className="text-xs font-semibold text-white leading-tight">Log Trip</div>
+                      <div className="text-[11px] mt-0.5 leading-tight" style={{ color: "#AAB7CA" }}>Track km</div>
                     </div>
                   </button>
-                  <button onClick={() => setAssistantOpen(true)} disabled={!ASSISTANT_URL} className="flex items-center gap-2 rounded-2xl p-3 text-left transition hover:brightness-110 disabled:opacity-50" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}><Mic size={16} color="#fff" /></div>
+                  <button
+                    onClick={() => setAssistantOpen(true)}
+                    disabled={!ASSISTANT_URL}
+                    className="flex flex-col items-start justify-center gap-2 rounded-[18px] px-3 py-3.5 text-left transition active:scale-[0.98] disabled:opacity-50"
+                    style={{ backgroundColor: "#14233A", border: "1px solid rgba(255,255,255,0.10)" }}
+                  >
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}><Sparkles size={18} color="#fff" /></div>
                     <div className="min-w-0">
-                      <div className="text-xs font-semibold text-white truncate">Ask Glovebox</div>
-                      <div className="text-[10px] text-white/60 truncate">Get answers</div>
+                      <div className="text-xs font-semibold text-white leading-tight">Ask Glovebox</div>
+                      <div className="text-[11px] mt-0.5 leading-tight" style={{ color: "#AAB7CA" }}>Get answers</div>
                     </div>
                   </button>
                 </div>
@@ -1474,7 +1490,7 @@ export default function App() {
                       <div className="text-xs mt-2" style={{ color: "#8A93A3" }}>Estimated refund</div>
                       <div className="text-4xl font-bold tabular mt-0.5" style={{ color: NAVY }}><AnimatedNumber value={Math.max(0, estimatedRefund)} /></div>
                       {weeklyDelta > 0 && (
-                        <div className="inline-flex items-center gap-1 mt-3 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: TEAL_TINT, color: TEAL_DARK }}>
+                        <div className="inline-flex items-center gap-1 mt-3 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: GREEN_TINT, color: GREEN_DARK }}>
                           <TrendingUp size={12} /> {fmt(weeklyDelta)} this month
                         </div>
                       )}
@@ -1526,7 +1542,7 @@ export default function App() {
                   {laundryTaxBenefit > 0 && (
                     <div className="flex items-center justify-between pt-3 mt-1" style={{ borderTop: "1px solid " + GREY_LINE }}>
                       <span className="text-xs font-semibold" style={{ color: NAVY_SOFT }}>Estimated tax benefit today</span>
-                      <span className="text-sm font-bold tabular" style={{ color: TEAL_DARK }}>+{fmt(laundryTaxBenefit)}</span>
+                      <span className="text-sm font-bold tabular" style={{ color: GREEN_DARK }}>+{fmt(laundryTaxBenefit)}</span>
                     </div>
                   )}
                 </Card>
@@ -1787,14 +1803,14 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium" style={{ color: "#8A93A3" }}>Total estimated deductions</span>
                   {monthGrowthPct !== 0 && (
-                    <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: TEAL_TINT, color: TEAL_DARK }}>
+                    <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: GREEN_TINT, color: GREEN_DARK }}>
                       <TrendingUp size={11} style={monthGrowthPct < 0 ? { transform: "scaleY(-1)" } : undefined} />{monthGrowthPct > 0 ? "Up" : "Down"} {Math.abs(monthGrowthPct)}%
                     </div>
                   )}
                 </div>
                 <div className="text-4xl font-bold tabular mt-1" style={{ color: NAVY }}><AnimatedNumber value={totalDeductions} /></div>
                 {thisMonthDelta !== 0 && (
-                  <div className="flex items-center gap-1.5 mt-2 text-sm font-medium" style={{ color: TEAL_DARK }}>
+                  <div className="flex items-center gap-1.5 mt-2 text-sm font-medium" style={{ color: GREEN_DARK }}>
                     <TrendingUp size={13} style={thisMonthDelta < 0 ? { transform: "scaleY(-1)" } : undefined} />{thisMonthDelta > 0 ? "+" : "-"}{fmt(Math.abs(thisMonthDelta))} this month
                   </div>
                 )}
