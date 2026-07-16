@@ -1,4 +1,4 @@
-# TaxMate Tradie
+# Glovebox
 
 A modern, mobile-first tax deduction dashboard for Australian apprentices and tradies — receipts, vehicle logbook, expense tracking, refund estimator and an end-of-year accountant summary pack, all in one place.
 

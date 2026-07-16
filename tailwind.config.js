@@ -7,9 +7,9 @@ export default {
         navy: "#132038",
         "navy-soft": "#3A4A66",
         teal: {
-          DEFAULT: "#0E9C94",
-          dark: "#0B7A73",
-          tint: "#E6F5F3",
+          DEFAULT: "#2A63E5",
+          dark: "#1E4FBE",
+          tint: "#E9EFFE",
         },
         amber: "#C77F1A",
         coral: "#C4573F",

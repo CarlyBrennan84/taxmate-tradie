@@ -2,7 +2,7 @@ import type { AppData } from "../types";
 import { supabase } from "./supabaseClient";
 
 /**
- * Storage layer for TaxMate Tradie. Every component only ever calls
+ * Storage layer for Glovebox. Every component only ever calls
  * loadData()/saveData() — this is the one place that knows how data is
  * actually persisted.
  *
@@ -39,7 +39,7 @@ async function migrateLocalDataIfAny(defaults: AppData, userId: string): Promise
     window.localStorage.removeItem(LOCAL_STORAGE_KEY);
     return merged;
   } catch (e) {
-    console.error("Failed to migrate local TaxMate data", e);
+    console.error("Failed to migrate local Glovebox data", e);
     return null;
   }
 }
@@ -60,7 +60,7 @@ export async function loadData(defaults: AppData, userId: string): Promise<AppDa
     }
     return mergeWithDefaults(defaults, (data.payload as Partial<AppData>) || {});
   } catch (e) {
-    console.error("Failed to load TaxMate Tradie data", e);
+    console.error("Failed to load Glovebox data", e);
     return defaults;
   }
 }
@@ -73,6 +73,6 @@ export async function saveData(data: AppData, userId: string): Promise<void> {
       .upsert({ user_id: userId, payload: data, updated_at: new Date().toISOString() });
     if (error) throw error;
   } catch (e) {
-    console.error("Failed to save TaxMate Tradie data", e);
+    console.error("Failed to save Glovebox data", e);
   }
 }

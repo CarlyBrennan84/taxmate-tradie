@@ -209,7 +209,7 @@ export default function BenefitsFeature() {
             <h3 className="text-base font-semibold">Check my benefits</h3>
           </div>
           <p className="text-sm text-white/90 leading-relaxed">
-            Answer a few questions and TaxMate will compare your circumstances against current Australian apprentice support programs.
+            Answer a few questions and Glovebox will compare your circumstances against current Australian apprentice support programs.
           </p>
           <div className="flex flex-wrap gap-2">
             <button onClick={startQuestionnaire} className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-white transition hover:brightness-95" style={{ color: TEAL_DARK }}>
@@ -400,7 +400,7 @@ export default function BenefitsFeature() {
               <BookmarkPlus size={14} />{savedProgramIds.has(program.id) ? "Saved to plan" : "Add to my plan"}
             </button>
           </div>
-          <p className="text-[11px] leading-relaxed" style={{ color: "#8A93A3" }}>Final eligibility is determined by the relevant government agency, not by TaxMate.</p>
+          <p className="text-[11px] leading-relaxed" style={{ color: "#8A93A3" }}>Final eligibility is determined by the relevant government agency, not by Glovebox.</p>
         </Card>
       </div>
     );

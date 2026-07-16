@@ -1,12 +1,12 @@
-# TaxMate Receipt Scanner (Cloudflare Worker)
+# Glovebox Receipt Scanner (Cloudflare Worker)
 
-A small serverless backend behind the TaxMate app. It exists so API keys
+A small serverless backend behind the Glovebox app. It exists so API keys
 never have to live in the browser-side app (which is a public static site) —
 they stay here, server-side. Routes:
 
 - `/` (root) — reads a receipt photo with Claude's vision API, returns
   vendor/date/amount/category
-- `/assistant` — the TaxMate AI chat, with tool use for logging trips/expenses
+- `/assistant` — the Glovebox AI chat, with tool use for logging trips/expenses
   and looking up/updating receipts
 - `/transcribe` — speech-to-text for voice input, via Cloudflare's own
   Whisper model (Workers AI binding, no extra account needed)

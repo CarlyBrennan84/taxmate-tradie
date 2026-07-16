@@ -1,6 +1,6 @@
-# TaxMate Tradie — accounts setup (Supabase)
+# Glovebox — accounts setup (Supabase)
 
-TaxMate now supports multiple users, each with their own private, invite-only
+Glovebox now supports multiple users, each with their own private, invite-only
 account. This is a one-time setup — once done, everything (rebuilds,
 deploys) just works.
 
@@ -41,7 +41,7 @@ work.
 
 Dashboard → **Authentication** → **Users** → **Invite user** → enter their
 email → send. They'll get an email with a link that logs them straight into
-TaxMate and prompts them to set a password. Repeat for each person.
+Glovebox and prompts them to set a password. Repeat for each person.
 
 ## 6. Get your API credentials
 

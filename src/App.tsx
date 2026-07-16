@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   LayoutDashboard, Receipt, Car, Wrench, Shirt, HardHat, Smartphone,
   GraduationCap, FileText, Plus, Trash2, ChevronRight, Menu,
-  Download, Printer, TrendingUp, Gauge, MapPin, Sparkles, Camera,
+  Download, Printer, TrendingUp, MapPin, Sparkles, Camera,
   Check, CheckCircle2, AlertTriangle, Fuel, Upload, ShieldCheck, X,
   Search, SlidersHorizontal, Send, Mic, LogOut, Landmark,
   Info, Wallet, Bell, MoreHorizontal, WashingMachine, Settings as SettingsIcon,
@@ -13,15 +13,16 @@ import { loadData, saveData } from "./lib/storage";
 import { supabase, arrivedViaInviteOrRecovery } from "./lib/supabaseClient";
 import { parseDriversnoteCSV } from "./csv";
 import BenefitsFeature from "./benefits/BenefitsFeature";
+import gloveboxLogo from "./assets/glovebox-logo.png";
 
 /* ---------------------------------------------------------------
    Design tokens
 ----------------------------------------------------------------*/
 export const NAVY = "#132038";
 export const NAVY_SOFT = "#3A4A66";
-export const TEAL = "#0E9C94";
-export const TEAL_DARK = "#0B7A73";
-export const TEAL_TINT = "#E6F5F3";
+export const TEAL = "#2A63E5";
+export const TEAL_DARK = "#1E4FBE";
+export const TEAL_TINT = "#E9EFFE";
 const GREY_BG = "#F6F7F9";
 export const GREY_LINE = "#E7E9EE";
 export const AMBER = "#C77F1A";
@@ -223,7 +224,9 @@ export function EmptyState({ icon: Icon, title, subtitle, action }: { icon: Reac
   );
 }
 
-function RadialProgress({ pct, label, size = 88 }: { pct: number; label: string; size?: number }) {
+function RadialProgress({
+  pct, label, size = 88, trackColor = "rgba(255,255,255,0.2)", progressColor = "#fff", textColor = "#fff", labelColor = "rgba(255,255,255,0.8)",
+}: { pct: number; label: string; size?: number; trackColor?: string; progressColor?: string; textColor?: string; labelColor?: string }) {
   const stroke = 7;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
@@ -231,16 +234,16 @@ function RadialProgress({ pct, label, size = 88 }: { pct: number; label: string;
   return (
     <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={trackColor} strokeWidth={stroke} />
         <circle
-          cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#fff" strokeWidth={stroke} strokeLinecap="round"
+          cx={size / 2} cy={size / 2} r={r} fill="none" stroke={progressColor} strokeWidth={stroke} strokeLinecap="round"
           strokeDasharray={c} strokeDashoffset={c * (1 - clamped)} style={{ transition: "stroke-dashoffset 700ms ease" }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-base font-bold text-white tabular">{Math.round(clamped * 100)}%</span>
+        <span className="text-base font-bold tabular" style={{ color: textColor }}>{Math.round(clamped * 100)}%</span>
       </div>
-      <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-medium text-white/80 whitespace-nowrap">{label}</div>
+      <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap" style={{ color: labelColor }}>{label}</div>
     </div>
   );
 }
@@ -461,7 +464,7 @@ function QuickSetupCard({ occupation, income, onSave, disabled }: { occupation: 
   const canSave = draftOccupation.trim() !== "" && (parseFloat(draftIncome) || 0) > 0;
   return (
     <Card className="p-5">
-      <SectionTitle eyebrow="Quick setup" title="Tell TaxMate about your work" sub="Just enough to start estimating your refund — you can refine the details later." />
+      <SectionTitle eyebrow="Quick setup" title="Tell Glovebox about your work" sub="Just enough to start estimating your refund — you can refine the details later." />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Job description">
           <input disabled={disabled} value={draftOccupation} onChange={(e) => setDraftOccupation(e.target.value)} placeholder="e.g. Apprentice Electrician" className={inputCls} />
@@ -551,7 +554,7 @@ function AssistantButton({ onClick, disabled }: { onClick: () => void; disabled?
     <button
       onClick={onClick}
       disabled={disabled}
-      aria-label="TaxMate AI"
+      aria-label="Glovebox AI"
       className="fixed left-4 sm:left-6 bottom-20 lg:bottom-6 z-40 w-14 h-14 rounded-full flex items-center justify-center shadow-card-hover transition disabled:opacity-50"
       style={{ backgroundColor: NAVY }}
     >
@@ -660,7 +663,7 @@ function AssistantModal({ messages, loading, onSend, onClose, disabled }: { mess
       <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: GREY_LINE }}>
         <div className="flex items-center gap-2">
           <Sparkles size={17} color={TEAL_DARK} />
-          <span className="text-sm font-bold" style={{ color: NAVY }}>TaxMate AI</span>
+          <span className="text-sm font-bold" style={{ color: NAVY }}>Glovebox AI</span>
         </div>
         <button onClick={onClose} className="p-1.5 rounded-lg text-[#B7BEC9] hover:bg-[#F0F1F4] transition"><X size={18} /></button>
       </div>
@@ -668,7 +671,7 @@ function AssistantModal({ messages, loading, onSend, onClose, disabled }: { mess
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {messages.length === 0 && (
           <div className="rounded-2xl px-4 py-3 max-w-[85%]" style={{ backgroundColor: "#FBFBFC" }}>
-            <p className="text-sm leading-relaxed" style={{ color: NAVY }}>Hi! I'm your TaxMate AI. Ask me anything about your tax, deductions or claims — or tell me about a trip or expense and I'll log it for you.{VOICE_SUPPORTED && TRANSCRIBE_URL ? " Tap the mic to just talk — handy when your hands are full." : ""}</p>
+            <p className="text-sm leading-relaxed" style={{ color: NAVY }}>Hi! I'm your Glovebox AI. Ask me anything about your tax, deductions or claims — or tell me about a trip or expense and I'll log it for you.{VOICE_SUPPORTED && TRANSCRIBE_URL ? " Tap the mic to just talk — handy when your hands are full." : ""}</p>
           </div>
         )}
         {messages.map((m, i) => {
@@ -778,7 +781,7 @@ function MethodCompareCard({ centsPerKmEstimate, logbookEstimate, logbookReady, 
             : "Based on what's logged so far, cents/km looks simpler and about as good — no need to keep tracking every vehicle expense receipt."
           : capped
           ? "You're already over the 5,000 km cap for cents/km — finishing your logbook could unlock a bigger, uncapped claim."
-          : "Cents/km is fine to use for now. Once your 12-week logbook is done, TaxMate will tell you if switching to the logbook method is worth more."}
+          : "Cents/km is fine to use for now. Once your 12-week logbook is done, Glovebox will tell you if switching to the logbook method is worth more."}
       </p>
     </Card>
   );
@@ -789,9 +792,8 @@ function MethodCompareCard({ centsPerKmEstimate, logbookEstimate, logbookReady, 
 ==================================================================*/
 function AuthLogo() {
   return (
-    <div className="flex items-center gap-2 justify-center mb-8">
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: NAVY }}><Gauge size={20} color={TEAL} /></div>
-      <span className="text-lg font-bold" style={{ color: NAVY }}>TaxMate Tradie</span>
+    <div className="flex justify-center mb-8">
+      <img src={gloveboxLogo} alt="Glovebox" className="h-12 w-auto rounded-xl" />
     </div>
   );
 }
@@ -1098,7 +1100,7 @@ export default function App() {
       }
       case "add_expense": {
         const category: CategoryKey = CATEGORIES.some((c) => c.key === input.category) ? input.category : "other";
-        const r: ReceiptT = { id: uid(), date: todayISO(), vendor: input.vendor || "Untitled", category, amount: Number(input.amount) || 0, workPct: 100, filed: false, notes: "Added via TaxMate AI" };
+        const r: ReceiptT = { id: uid(), date: todayISO(), vendor: input.vendor || "Untitled", category, amount: Number(input.amount) || 0, workPct: 100, filed: false, notes: "Added via Glovebox AI" };
         addReceipt(r);
         return `Added ${r.vendor} — ${fmtDec(r.amount)} to ${category}.`;
       }
@@ -1370,11 +1372,8 @@ export default function App() {
       <div className="flex">
         <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 h-screen sticky top-0 border-r px-4 py-6 print:hidden" style={{ borderColor: GREY_LINE, backgroundColor: "#FFFFFF" }}>
           <div className="flex items-center gap-2 px-2 mb-8">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: NAVY }}><Gauge size={16} color={TEAL} /></div>
-            <div>
-              <div className="text-sm font-bold leading-tight" style={{ color: NAVY }}>TaxMate Tradie</div>
-              <div className="text-[11px] text-[#8A93A3] leading-tight">{activeData.profile.fy}</div>
-            </div>
+            <img src={gloveboxLogo} alt="Glovebox" className="h-8 w-auto rounded-lg" />
+            <div className="text-[11px] text-[#8A93A3] leading-tight">{activeData.profile.fy}</div>
           </div>
           <nav className="flex flex-col gap-1">
             {NAV.map((n) => (
@@ -1395,8 +1394,7 @@ export default function App() {
 
         <div className="lg:hidden fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 border-b print:hidden" style={{ backgroundColor: "#FFFFFFF2", borderColor: GREY_LINE, backdropFilter: "blur(8px)" }}>
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: NAVY }}><Gauge size={14} color={TEAL} /></div>
-            <span className="text-sm font-bold" style={{ color: NAVY }}>TaxMate Tradie</span>
+            <img src={gloveboxLogo} alt="Glovebox" className="h-7 w-auto rounded-md" />
           </div>
           <div className="relative p-2" aria-hidden="true"><Bell size={19} color={NAVY} /><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ backgroundColor: "#D64545" }} /></div>
         </div>
@@ -1423,25 +1421,30 @@ export default function App() {
 
           {tab === "overview" && (
             <div className="space-y-6">
-              <div>
-                <h1 className="text-2xl font-bold" style={{ color: NAVY }}>{greeting}{activeData.profile.name ? `, ${activeData.profile.name}` : ""} 👋</h1>
-                <p className="text-sm mt-1" style={{ color: "#8A93A3" }}>{estimatedRefund > 0 ? "You're on track to save" : `${activeData.profile.occupation} · ${activeData.profile.fy}`}</p>
-              </div>
-
-              <div>
-                <div className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Quick actions</div>
-                <div className="grid grid-cols-3 gap-3">
-                  <button onClick={quickUploadReceipt} className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-white border shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ borderColor: GREY_LINE }}>
-                    <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: NAVY }}><Camera size={18} color="#fff" /></div>
-                    <span className="text-xs font-semibold" style={{ color: NAVY }}>Scan Receipt</span>
+              <div className="rounded-3xl p-6 fade-up" style={{ backgroundColor: NAVY }}>
+                <h1 className="text-2xl font-bold text-white">{greeting}{activeData.profile.name ? `, ${activeData.profile.name}` : ""} 👋</h1>
+                <p className="text-sm mt-1 text-white/70">{estimatedRefund > 0 ? "You're on track to save" : `${activeData.profile.occupation} · ${activeData.profile.fy}`}</p>
+                <div className="grid grid-cols-3 gap-2 mt-5">
+                  <button onClick={quickUploadReceipt} className="flex items-center gap-2 rounded-2xl p-3 text-left transition hover:brightness-110" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}><Camera size={16} color="#fff" /></div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-white truncate">Scan Receipt</div>
+                      <div className="text-[10px] text-white/60 truncate">Snap & save</div>
+                    </div>
                   </button>
-                  <button onClick={quickLogTravel} className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-white border shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ borderColor: GREY_LINE }}>
-                    <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: NAVY }}><Car size={18} color="#fff" /></div>
-                    <span className="text-xs font-semibold" style={{ color: NAVY }}>Log Trip</span>
+                  <button onClick={quickLogTravel} className="flex items-center gap-2 rounded-2xl p-3 text-left transition hover:brightness-110" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}><Car size={16} color="#fff" /></div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-white truncate">Log Trip</div>
+                      <div className="text-[10px] text-white/60 truncate">Track km</div>
+                    </div>
                   </button>
-                  <button onClick={() => setAssistantOpen(true)} disabled={!ASSISTANT_URL} className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-white border shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ borderColor: GREY_LINE }}>
-                    <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: NAVY }}><Mic size={18} color="#fff" /></div>
-                    <span className="text-xs font-semibold" style={{ color: NAVY }}>Ask TaxMate</span>
+                  <button onClick={() => setAssistantOpen(true)} disabled={!ASSISTANT_URL} className="flex items-center gap-2 rounded-2xl p-3 text-left transition hover:brightness-110 disabled:opacity-50" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}><Mic size={16} color="#fff" /></div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-white truncate">Ask Glovebox</div>
+                      <div className="text-[10px] text-white/60 truncate">Get answers</div>
+                    </div>
                   </button>
                 </div>
               </div>
@@ -1451,29 +1454,30 @@ export default function App() {
                   occupation={activeData.profile.occupation}
                   income={activeData.profile.income}
                   onSave={saveQuickSetup}
-                 
                 />
               ) : (
-                <div className="rounded-3xl p-6 fade-up" style={{ background: `linear-gradient(135deg, ${NAVY} 0%, ${TEAL_DARK} 100%)` }}>
+                <Card className="p-6">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-white/70">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: "#8A93A3" }}>
                         Estimated Tax Position <Info size={12} />
                       </div>
-                      <div className="text-xs mt-2 text-white/70">Estimated refund</div>
-                      <div className="text-4xl font-bold tabular mt-0.5 text-white"><AnimatedNumber value={Math.max(0, estimatedRefund)} /></div>
+                      <div className="text-xs mt-2" style={{ color: "#8A93A3" }}>Estimated refund</div>
+                      <div className="text-4xl font-bold tabular mt-0.5" style={{ color: NAVY }}><AnimatedNumber value={Math.max(0, estimatedRefund)} /></div>
                       {weeklyDelta > 0 && (
-                        <div className="inline-flex items-center gap-1 mt-3 px-3 py-1 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: "rgba(255,255,255,0.18)" }}>
+                        <div className="inline-flex items-center gap-1 mt-3 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: TEAL_TINT, color: TEAL_DARK }}>
                           <TrendingUp size={12} /> {fmt(weeklyDelta)} this month
                         </div>
                       )}
                     </div>
-                    <div className="pt-2 pb-3"><RadialProgress pct={readyPct} label="Tax Ready" /></div>
+                    <div className="pt-2 pb-3">
+                      <RadialProgress pct={readyPct} label="Tax Ready" trackColor={GREY_LINE} progressColor={TEAL} textColor={NAVY} labelColor="#8A93A3" />
+                    </div>
                   </div>
                   <div className="mt-3 -mx-1">
-                    <TrendSparkline points={weeklyDeductionsTrend} color="#5EEAD4" />
+                    <TrendSparkline points={weeklyDeductionsTrend} color={TEAL} />
                   </div>
-                  <div className="mt-5 pt-4 grid grid-cols-4 gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.15)" }}>
+                  <div className="mt-5 pt-4 grid grid-cols-4 gap-2" style={{ borderTop: "1px solid " + GREY_LINE }}>
                     {[
                       { icon: Wallet, label: "Income", value: fmt(income) },
                       { icon: Landmark, label: "Tax withheld", value: fmt(withheld) },
@@ -1481,13 +1485,13 @@ export default function App() {
                       { icon: Car, label: "Vehicle method", value: "Logbook" },
                     ].map((s) => (
                       <div key={s.label} className="flex flex-col items-center text-center gap-1.5">
-                        <s.icon size={15} className="text-white/60" />
-                        <div className="text-[10px] leading-tight text-white/60">{s.label}</div>
-                        <div className="text-xs font-semibold tabular text-white">{s.value}</div>
+                        <s.icon size={15} style={{ color: TEAL_DARK }} />
+                        <div className="text-[10px] leading-tight" style={{ color: "#8A93A3" }}>{s.label}</div>
+                        <div className="text-xs font-semibold tabular" style={{ color: NAVY }}>{s.value}</div>
                       </div>
                     ))}
                   </div>
-                </div>
+                </Card>
               )}
 
               {todaysTasks.length > 0 && (
@@ -1520,13 +1524,13 @@ export default function App() {
               )}
 
               {todaySuggestion && (
-                <Card className="p-4 flex items-center gap-3">
+                <Card className="p-4 flex items-center gap-3" style={{ backgroundColor: TEAL_TINT }}>
                   <Sparkles size={16} color={TEAL_DARK} className="flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#8A93A3" }}>TaxMate Insight</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEAL_DARK }}>Glovebox Insight</div>
                     <div className="text-sm font-medium mt-0.5" style={{ color: NAVY }}>{todaySuggestion.text}</div>
                   </div>
-                  <button onClick={todaySuggestion.action} className="px-3.5 py-1.5 rounded-full text-xs font-semibold flex-shrink-0 disabled:opacity-50 transition hover:brightness-95" style={{ backgroundColor: TEAL_TINT, color: TEAL_DARK }}>
+                  <button onClick={todaySuggestion.action} className="px-3.5 py-1.5 rounded-full text-xs font-semibold flex-shrink-0 disabled:opacity-50 transition hover:brightness-95 bg-white" style={{ color: TEAL_DARK }}>
                     Add now
                   </button>
                 </Card>
@@ -1629,7 +1633,7 @@ export default function App() {
               <Card className="p-2 sm:p-4">
                 <div className="px-2">
                   {receiptsForTab.length === 0 ? (
-                    <EmptyState icon={Receipt} title="Nothing here" subtitle="Tap the + button to scan a receipt — TaxMate will sort it into the right category." />
+                    <EmptyState icon={Receipt} title="Nothing here" subtitle="Tap the + button to scan a receipt — Glovebox will sort it into the right category." />
                   ) : (
                     receiptsForTab.map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} onEdit={setEditingReceipt} />)
                   )}
@@ -1685,7 +1689,7 @@ export default function App() {
               </Disclosure>
 
               <Disclosure title="Import from Driversnote">
-                <p className="text-xs mb-3" style={{ color: "#8A93A3" }}>Export a CSV from Driversnote and drop it in — TaxMate will match up dates, distances and trip purposes.</p>
+                <p className="text-xs mb-3" style={{ color: "#8A93A3" }}>Export a CSV from Driversnote and drop it in — Glovebox will match up dates, distances and trip purposes.</p>
                 <button onClick={() => csvInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition disabled:opacity-50" style={{ borderColor: GREY_LINE, color: NAVY }}><Upload size={15} />Import Driversnote CSV</button>
               </Disclosure>
 
@@ -1843,13 +1847,13 @@ export default function App() {
               )}
 
               {todaySuggestion && (
-                <Card className="p-4 flex items-center gap-3">
+                <Card className="p-4 flex items-center gap-3" style={{ backgroundColor: TEAL_TINT }}>
                   <Sparkles size={16} color={TEAL_DARK} className="flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#8A93A3" }}>TaxMate Insight</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEAL_DARK }}>Glovebox Insight</div>
                     <div className="text-sm font-medium mt-0.5" style={{ color: NAVY }}>{todaySuggestion.text}</div>
                   </div>
-                  <button onClick={todaySuggestion.action} className="px-3.5 py-1.5 rounded-full text-xs font-semibold flex-shrink-0 disabled:opacity-50 transition hover:brightness-95" style={{ backgroundColor: TEAL_TINT, color: TEAL_DARK }}>
+                  <button onClick={todaySuggestion.action} className="px-3.5 py-1.5 rounded-full text-xs font-semibold flex-shrink-0 disabled:opacity-50 transition hover:brightness-95 bg-white" style={{ color: TEAL_DARK }}>
                     Add now
                   </button>
                 </Card>
@@ -1979,7 +1983,7 @@ export default function App() {
               </Card>
 
               <Card className="p-5">
-                <SectionTitle title="AI travel memory" eyebrow="What TaxMate AI remembers when you log trips" />
+                <SectionTitle title="AI travel memory" eyebrow="What Glovebox AI remembers when you log trips" />
                 <div className="grid grid-cols-2 gap-4">
                   <Field label="Home address">
                     <input value={activeData.profile.homeAddress || ""} onChange={(e) => updateTravelProfile({ homeAddress: e.target.value })} placeholder="e.g. 18 Maureen Close, Cranbourne West" className={inputCls} />
@@ -1991,7 +1995,7 @@ export default function App() {
                     </select>
                   </Field>
                 </div>
-                <p className="text-xs mt-3 leading-relaxed" style={{ color: "#8A93A3" }}>TaxMate AI uses these so it doesn't have to ask every time you log a trip — it'll also update them automatically as you chat.</p>
+                <p className="text-xs mt-3 leading-relaxed" style={{ color: "#8A93A3" }}>Glovebox AI uses these so it doesn't have to ask every time you log a trip — it'll also update them automatically as you chat.</p>
               </Card>
 
               <Card className="p-5">

@@ -150,7 +150,7 @@ function assistantSystemPrompt(ctx: AssistantContext): string {
     ? `Known travel details — don't ask for these again, just use them: ${knownTravel.join("; ")}.`
     : `You don't know this user's home address or travel habits yet — the first time they mention one, call update_travel_profile to remember it.`;
 
-  return `You are TaxMate AI, a friendly assistant inside TaxMate Tradie — a tax deduction tracker for Australian apprentices and tradies.
+  return `You are Glovebox AI, a friendly assistant inside Glovebox — a tax deduction tracker for Australian apprentices and tradies.
 
 Today's date is ${ctx.today || "unknown"} — use it to resolve relative or partial dates (e.g. "last week", "Wednesday 1st July" with no year) into yyyy-mm-dd.
 
