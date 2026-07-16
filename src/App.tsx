@@ -18,7 +18,7 @@ import gloveboxLogo from "./assets/glovebox-logo.png";
 /* ---------------------------------------------------------------
    Design tokens
 ----------------------------------------------------------------*/
-export const NAVY = "#04142F";
+export const NAVY = "#010818";
 export const NAVY_SOFT = "#3A4A66";
 export const TEAL = "#2A63E5";
 export const TEAL_DARK = "#1E4FBE";
@@ -209,7 +209,7 @@ export function Field({ label, children }: { label: string; children: React.Reac
   );
 }
 
-export const inputCls = "w-full rounded-xl border border-[#E7E9EE] bg-[#FBFBFC] px-3 py-2 text-sm text-[#04142F] focus:outline-none focus:ring-2 focus:ring-teal focus:border-transparent transition disabled:opacity-50 disabled:cursor-not-allowed";
+export const inputCls = "w-full rounded-xl border border-[#E7E9EE] bg-[#FBFBFC] px-3 py-2 text-sm text-[#010818] focus:outline-none focus:ring-2 focus:ring-teal focus:border-transparent transition disabled:opacity-50 disabled:cursor-not-allowed";
 
 export function EmptyState({ icon: Icon, title, subtitle, action }: { icon: React.ElementType; title: string; subtitle: string; action?: React.ReactNode }) {
   return (
