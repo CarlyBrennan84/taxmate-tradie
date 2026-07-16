@@ -793,7 +793,7 @@ function MethodCompareCard({ centsPerKmEstimate, logbookEstimate, logbookReady, 
 function AuthLogo() {
   return (
     <div className="flex justify-center mb-8">
-      <img src={gloveboxLogo} alt="Glovebox" className="h-12 w-auto rounded-xl" />
+      <img src={gloveboxLogo} alt="Glovebox" className="h-20 w-auto rounded-xl" />
     </div>
   );
 }
@@ -1372,7 +1372,7 @@ export default function App() {
       <div className="flex">
         <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 h-screen sticky top-0 border-r px-4 py-6 print:hidden" style={{ borderColor: GREY_LINE, backgroundColor: "#FFFFFF" }}>
           <div className="flex items-center gap-2 px-2 mb-8">
-            <img src={gloveboxLogo} alt="Glovebox" className="h-8 w-auto rounded-lg" />
+            <img src={gloveboxLogo} alt="Glovebox" className="h-10 w-auto rounded-lg" />
             <div className="text-[11px] text-[#8A93A3] leading-tight">{activeData.profile.fy}</div>
           </div>
           <nav className="flex flex-col gap-1">
@@ -1392,12 +1392,14 @@ export default function App() {
           </div>
         </aside>
 
-        <div className="lg:hidden fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 border-b print:hidden" style={{ backgroundColor: "#FFFFFFF2", borderColor: GREY_LINE, backdropFilter: "blur(8px)" }}>
-          <div className="flex items-center gap-2">
-            <img src={gloveboxLogo} alt="Glovebox" className="h-7 w-auto rounded-md" />
+        {tab !== "overview" && (
+          <div className="lg:hidden fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 border-b print:hidden" style={{ backgroundColor: "#FFFFFFF2", borderColor: GREY_LINE, backdropFilter: "blur(8px)" }}>
+            <div className="flex items-center gap-2">
+              <img src={gloveboxLogo} alt="Glovebox" className="h-9 w-auto rounded-md" />
+            </div>
+            <div className="relative p-2" aria-hidden="true"><Bell size={19} color={NAVY} /><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ backgroundColor: "#D64545" }} /></div>
           </div>
-          <div className="relative p-2" aria-hidden="true"><Bell size={19} color={NAVY} /><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ backgroundColor: "#D64545" }} /></div>
-        </div>
+        )}
         {mobileNav && (
           <div className="lg:hidden fixed bottom-[64px] left-0 right-0 z-30 bg-white border-t px-4 py-3 space-y-1 rounded-t-2xl shadow-card-hover" style={{ borderColor: GREY_LINE }}>
             <button onClick={() => { setTab("progress"); setMobileNav(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium" style={tab === "progress" ? { backgroundColor: TEAL_TINT, color: TEAL_DARK } : { color: "#5B6472" }}>
@@ -1421,7 +1423,14 @@ export default function App() {
 
           {tab === "overview" && (
             <div className="space-y-6">
-              <div className="rounded-3xl p-6 fade-up" style={{ backgroundColor: NAVY }}>
+              <div className="rounded-b-3xl lg:rounded-3xl -mx-4 sm:-mx-6 lg:mx-0 -mt-[68px] lg:mt-0 px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-6 fade-up" style={{ backgroundColor: NAVY }}>
+                <div className="lg:hidden relative flex items-center justify-center mb-5">
+                  <img src={gloveboxLogo} alt="Glovebox" className="w-[70%] max-w-[280px] h-auto" />
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 p-2" aria-hidden="true">
+                    <Bell size={20} color="#fff" />
+                    <span className="absolute top-2 right-2 w-2 h-2 rounded-full" style={{ backgroundColor: "#D64545" }} />
+                  </div>
+                </div>
                 <h1 className="text-2xl font-bold text-white">{greeting}{activeData.profile.name ? `, ${activeData.profile.name}` : ""} 👋</h1>
                 <p className="text-sm mt-1 text-white/70">{estimatedRefund > 0 ? "You're on track to save" : `${activeData.profile.occupation} · ${activeData.profile.fy}`}</p>
                 <div className="grid grid-cols-3 gap-2 mt-5">
