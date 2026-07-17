@@ -437,25 +437,29 @@ function ScanCaptureScreen({ onClose, onGallery, onShutter }: { onClose: () => v
   );
 }
 
-function ReceiptRow({ r, onDelete, onEdit }: { r: ReceiptT; onDelete: (id: string) => void; onEdit: (r: ReceiptT) => void }) {
+function ReceiptRow({ r, onDelete, onEdit, dark }: { r: ReceiptT; onDelete: (id: string) => void; onEdit: (r: ReceiptT) => void; dark?: boolean }) {
   const ded = r.amount * (r.workPct / 100);
   const cat = CATEGORIES.find((c) => c.key === r.category);
   const incomplete = !r.vendor || !r.amount;
   return (
-    <div role="button" tabIndex={0} onClick={() => onEdit(r)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onEdit(r); }} className="w-full flex items-center gap-3 py-3 px-1 border-b last:border-0 text-left transition hover:bg-[#FBFBFC] cursor-pointer" style={{ borderColor: GREY_LINE }}>
-      <div className="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL_TINT }}>
-        {cat && <cat.icon size={16} color={TEAL_DARK} />}
+    <div
+      role="button" tabIndex={0} onClick={() => onEdit(r)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onEdit(r); }}
+      className={`w-full flex items-center gap-3 py-3 px-1 border-b last:border-0 text-left transition cursor-pointer ${dark ? "hover:bg-white/5" : "hover:bg-[#FBFBFC]"}`}
+      style={{ borderColor: dark ? "rgba(255,255,255,0.08)" : GREY_LINE }}
+    >
+      <div className="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ backgroundColor: dark ? "rgba(37,99,255,0.15)" : TEAL_TINT }}>
+        {cat && <cat.icon size={16} color={dark ? TEAL : TEAL_DARK} />}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium truncate" style={{ color: NAVY }}>{r.vendor || "Untitled receipt"}</div>
-        <div className="text-xs text-[#8A93A3] truncate">{cat?.label} · {new Date(r.date).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" })}{r.notes ? ` · ${r.notes}` : ""}</div>
+        <div className={`text-sm font-medium truncate ${dark ? "text-white" : ""}`} style={dark ? undefined : { color: NAVY }}>{r.vendor || "Untitled receipt"}</div>
+        <div className="text-xs truncate" style={{ color: dark ? "#79879C" : "#8A93A3" }}>{cat?.label} · {new Date(r.date).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" })}{r.notes ? ` · ${r.notes}` : ""}</div>
       </div>
       <div className="text-right flex-shrink-0">
-        <div className="text-sm font-semibold" style={{ color: NAVY }}>{fmtDec(r.amount)}</div>
-        <div className="text-[11px] text-[#8A93A3]">{r.workPct}% · ded. {fmtDec(ded)}</div>
+        <div className={`text-sm font-semibold ${dark ? "text-white" : ""}`} style={dark ? undefined : { color: NAVY }}>{fmtDec(r.amount)}</div>
+        <div className="text-[11px]" style={{ color: dark ? "#79879C" : "#8A93A3" }}>{r.workPct}% · ded. {fmtDec(ded)}</div>
       </div>
       {incomplete ? <Pill tone="amber">Needs details</Pill> : r.filed ? <Pill tone="teal">Filed</Pill> : <Pill tone="amber">To file</Pill>}
-      <button onClick={(e) => { e.stopPropagation(); onDelete(r.id); }} className="p-1.5 rounded-lg text-[#B7BEC9] hover:text-[#C4573F] hover:bg-[#FBEAE6] transition flex-shrink-0"><Trash2 size={15} /></button>
+      <button onClick={(e) => { e.stopPropagation(); onDelete(r.id); }} className="p-1.5 rounded-lg transition flex-shrink-0" style={dark ? { color: "#5B6980" } : { color: "#B7BEC9" }}><Trash2 size={15} /></button>
     </div>
   );
 }
@@ -1777,7 +1781,7 @@ export default function App() {
           </div>
         </aside>
 
-        {tab !== "overview" && tab !== "vehicle" && (
+        {tab !== "overview" && tab !== "vehicle" && tab !== "expenses" && (
           <div className="lg:hidden fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 border-b print:hidden" style={{ backgroundColor: "#FFFFFFF2", borderColor: GREY_LINE, backdropFilter: "blur(8px)" }}>
             <div className="flex items-center gap-2">
               <img src={gloveboxLogo} alt="Glovebox" className="h-9 w-auto rounded-md" />
@@ -2309,7 +2313,7 @@ export default function App() {
                               <p className="text-xs mt-1" style={{ color: "#79879C" }}>Scan a fuel, servicing or insurance receipt and tag it as "Vehicle &amp; Fuel".</p>
                             </div>
                           ) : (
-                            receiptsWithNum.filter((r) => r.category === "vehicle").map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} onEdit={setEditingReceipt} />)
+                            receiptsWithNum.filter((r) => r.category === "vehicle").map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} onEdit={setEditingReceipt} dark />)
                           )}
                         </div>
                       </div>
@@ -2368,130 +2372,141 @@ export default function App() {
           )}
 
           {tab === "expenses" && (
-            <div className="space-y-6">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h1 className="text-2xl font-bold" style={{ color: NAVY }}>Deductions</h1>
-                  <p className="text-sm mt-1" style={{ color: "#8A93A3" }}>Track your claims and grow your refund</p>
+            <div className="-mx-4 sm:-mx-6 lg:mx-0 -mt-[68px] lg:mt-0 min-h-screen lg:min-h-0 lg:rounded-3xl fade-up" style={{ backgroundColor: "#081425" }}>
+              <div className="px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-4 flex items-center justify-between">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}>
+                    <Zap size={18} color="#fff" fill="#fff" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xl font-bold text-white">Deductions</div>
+                    <div className="text-xs mt-0.5 truncate" style={{ color: "#79879C" }}>Track your deductions and grow your refund.</div>
+                  </div>
                 </div>
                 <button
                   onClick={() => setShowReceiptFilters((v) => !v)}
-                  className="w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 transition"
-                  style={showReceiptFilters ? { backgroundColor: TEAL_TINT, borderColor: TEAL_TINT, color: TEAL_DARK } : { borderColor: GREY_LINE, color: NAVY_SOFT }}
+                  className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition"
+                  style={showReceiptFilters ? { backgroundColor: "rgba(37,99,255,0.15)", color: TEAL } : { backgroundColor: "#0D1B2E", color: "#AEB9CB" }}
                   aria-label="Filters"
                 >
                   <SlidersHorizontal size={16} />
                 </button>
               </div>
 
-              <Card className="p-6">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium" style={{ color: "#8A93A3" }}>Total estimated deductions</span>
-                  {monthGrowthPct !== 0 && (
-                    <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: GREEN_TINT, color: GREEN_DARK }}>
-                      <TrendingUp size={11} style={monthGrowthPct < 0 ? { transform: "scaleY(-1)" } : undefined} />{monthGrowthPct > 0 ? "Up" : "Down"} {Math.abs(monthGrowthPct)}%
+              <div className="px-4 sm:px-6 lg:px-6 pb-28 lg:pb-10 space-y-4">
+                <div className="rounded-2xl p-5" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium" style={{ color: "#79879C" }}>Total estimated deductions</span>
+                    {monthGrowthPct !== 0 && (
+                      <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: "rgba(24,195,126,0.15)", color: GREEN }}>
+                        <TrendingUp size={11} style={monthGrowthPct < 0 ? { transform: "scaleY(-1)" } : undefined} />{monthGrowthPct > 0 ? "Up" : "Down"} {Math.abs(monthGrowthPct)}%
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-4xl font-bold tabular mt-1 text-white"><AnimatedNumber value={totalDeductions} /></div>
+                  {thisMonthDelta !== 0 && (
+                    <div className="flex items-center gap-1.5 mt-2 text-sm font-medium" style={{ color: GREEN }}>
+                      <TrendingUp size={13} style={thisMonthDelta < 0 ? { transform: "scaleY(-1)" } : undefined} />{thisMonthDelta > 0 ? "+" : "-"}{fmt(Math.abs(thisMonthDelta))} this month
                     </div>
                   )}
-                </div>
-                <div className="text-4xl font-bold tabular mt-1" style={{ color: NAVY }}><AnimatedNumber value={totalDeductions} /></div>
-                {thisMonthDelta !== 0 && (
-                  <div className="flex items-center gap-1.5 mt-2 text-sm font-medium" style={{ color: GREEN_DARK }}>
-                    <TrendingUp size={13} style={thisMonthDelta < 0 ? { transform: "scaleY(-1)" } : undefined} />{thisMonthDelta > 0 ? "+" : "-"}{fmt(Math.abs(thisMonthDelta))} this month
+                  <div className="text-xs mt-0.5" style={{ color: "#79879C" }}>Compared to last month</div>
+                  <div className="mt-3 -mx-1">
+                    <TrendSparkline points={monthlyDeductionsTrend} color={TEAL} />
                   </div>
-                )}
-                <div className="text-xs mt-0.5" style={{ color: "#8A93A3" }}>Compared to last month</div>
-                <div className="mt-3 -mx-1">
-                  <TrendSparkline points={monthlyDeductionsTrend} color={TEAL} />
                 </div>
-              </Card>
 
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-semibold" style={{ color: NAVY }}>By category</span>
-                  <button onClick={() => receiptsListRef.current?.scrollIntoView({ behavior: "smooth" })} className="text-xs font-semibold" style={{ color: TEAL_DARK }}>View all categories</button>
-                </div>
-                <Card className="p-2">
-                  {deductionCategoryRows.map((row) => (
-                    <button key={row.key} onClick={row.onGo} className="w-full text-left px-3 py-3 flex items-center gap-3 border-b last:border-0 transition hover:bg-[#FBFBFC]" style={{ borderColor: GREY_LINE }}>
-                      <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL_TINT }}><row.icon size={16} color={TEAL_DARK} /></div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold" style={{ color: NAVY }}>{row.label}</div>
-                        <div className="text-xs mt-0.5" style={row.needsSetup ? { color: AMBER, fontWeight: 600 } : { color: "#8A93A3" }}>{row.sub}</div>
-                        <div className="mt-1.5 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "#EEF0F4" }}>
-                          <div className="h-full rounded-full" style={{ width: `${Math.min(100, (row.amount / maxCategoryRowAmount) * 100)}%`, backgroundColor: row.needsSetup ? "#D8DCE3" : TEAL }} />
-                        </div>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <div className="text-sm font-bold tabular" style={{ color: NAVY }}>{fmt(row.amount)}</div>
-                        <div className="text-[11px]" style={{ color: "#8A93A3" }}>{totalDeductions > 0 ? Math.round((row.amount / totalDeductions) * 100) : 0}% of total</div>
-                      </div>
-                      <ChevronRight size={15} className="flex-shrink-0" style={{ color: "#B7BEC9" }} />
-                    </button>
-                  ))}
-                </Card>
-              </div>
-
-              {recentReceipts.length > 0 && (
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-semibold" style={{ color: NAVY }}>Recent receipts</span>
-                    <button onClick={() => receiptsListRef.current?.scrollIntoView({ behavior: "smooth" })} className="text-xs font-semibold" style={{ color: TEAL_DARK }}>View all receipts</button>
+                    <span className="text-sm font-semibold text-white">By category</span>
+                    <button onClick={() => receiptsListRef.current?.scrollIntoView({ behavior: "smooth" })} className="text-xs font-semibold" style={{ color: TEAL }}>View all categories</button>
                   </div>
-                  <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
-                    {recentReceipts.map((r) => {
-                      const cat = CATEGORIES.find((c) => c.key === r.category);
-                      return (
-                        <button key={r.id} onClick={() => setEditingReceipt(r)} className="flex-shrink-0 w-36 text-left">
-                          <Card className="p-3">
-                            <div className="w-full h-16 rounded-xl flex items-center justify-center mb-2" style={{ backgroundColor: TEAL_TINT }}>{cat && <cat.icon size={22} color={TEAL_DARK} />}</div>
-                            <div className="text-xs font-semibold truncate" style={{ color: NAVY }}>{r.vendor || "Untitled"}</div>
-                            <div className="text-[10px] mt-0.5" style={{ color: "#8A93A3" }}>{new Date(r.date).toLocaleDateString("en-AU", { day: "2-digit", month: "short" })}</div>
-                            {cat && <div className="mt-1.5"><Pill tone="teal">{cat.label}</Pill></div>}
-                            <div className="text-sm font-bold tabular mt-1.5" style={{ color: NAVY }}>{fmtDec(r.amount)}</div>
-                          </Card>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {todaySuggestion && (
-                <Card className="p-4 flex items-center gap-3" style={{ backgroundColor: TEAL_TINT }}>
-                  <Sparkles size={16} color={TEAL_DARK} className="flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEAL_DARK }}>Glovebox Insight</div>
-                    <div className="text-sm font-medium mt-0.5" style={{ color: NAVY }}>{todaySuggestion.text}</div>
-                  </div>
-                  <button onClick={todaySuggestion.action} className="px-3.5 py-1.5 rounded-full text-xs font-semibold flex-shrink-0 disabled:opacity-50 transition hover:brightness-95 bg-white" style={{ color: TEAL_DARK }}>
-                    Add now
-                  </button>
-                </Card>
-              )}
-
-              <button onClick={() => setTab("settings")} className="w-full flex items-center justify-between px-5 py-4 rounded-2xl border bg-white text-left transition hover:bg-[#FBFBFC]" style={{ borderColor: GREY_LINE }}>
-                <span className="text-sm font-semibold" style={{ color: NAVY }}>Your details & other deductions</span>
-                <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: TEAL_DARK }}>Edit in Settings<ChevronRight size={14} /></span>
-              </button>
-
-              <Card className="p-2 sm:p-4">
-                <div ref={receiptsListRef} style={{ scrollMarginTop: "80px" }} />
-                {showReceiptFilters && (
-                  <div className="flex items-center gap-2 flex-wrap px-2 pt-2 pb-3">
-                    <button onClick={() => setReceiptCategoryFilter("all")} className="px-3 py-1.5 rounded-full text-xs font-medium transition" style={receiptCategoryFilter === "all" ? { backgroundColor: NAVY, color: "#fff" } : { backgroundColor: "#F0F1F4", color: "#5B6472" }}>All work expenses</button>
-                    {CATEGORIES.map((c) => (
-                      <button key={c.key} onClick={() => setReceiptCategoryFilter(c.key)} className="px-3 py-1.5 rounded-full text-xs font-medium transition" style={receiptCategoryFilter === c.key ? { backgroundColor: NAVY, color: "#fff" } : { backgroundColor: "#F0F1F4", color: "#5B6472" }}>{c.label}</button>
+                  <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                    {deductionCategoryRows.map((row) => (
+                      <button key={row.key} onClick={row.onGo} className="w-full text-left px-4 py-3.5 flex items-center gap-3 border-b last:border-0 transition hover:bg-white/5" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(37,99,255,0.15)" }}><row.icon size={16} style={{ color: TEAL }} /></div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold text-white">{row.label}</div>
+                          <div className="text-xs mt-0.5" style={row.needsSetup ? { color: AMBER, fontWeight: 600 } : { color: "#79879C" }}>{row.sub}</div>
+                          <div className="mt-1.5 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
+                            <div className="h-full rounded-full" style={{ width: `${Math.min(100, (row.amount / maxCategoryRowAmount) * 100)}%`, backgroundColor: row.needsSetup ? "rgba(255,255,255,0.18)" : TEAL }} />
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="text-sm font-bold text-white tabular">{fmt(row.amount)}</div>
+                          <div className="text-[11px]" style={{ color: "#79879C" }}>{totalDeductions > 0 ? Math.round((row.amount / totalDeductions) * 100) : 0}% of total</div>
+                        </div>
+                        <ChevronRight size={15} className="flex-shrink-0" style={{ color: "#3A4A66" }} />
+                      </button>
                     ))}
                   </div>
-                )}
-                <div className="px-2">
-                  {filteredReceipts.filter((r) => receiptCategoryFilter !== "all" || r.category !== "vehicle").length === 0 ? (
-                    <EmptyState icon={Wrench} title="Nothing here yet" subtitle="Tap the + button to scan a receipt straight into this category." />
-                  ) : (
-                    filteredReceipts.filter((r) => receiptCategoryFilter !== "all" || r.category !== "vehicle").map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} onEdit={setEditingReceipt} />)
-                  )}
                 </div>
-              </Card>
+
+                {recentReceipts.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-semibold text-white">Recent receipts</span>
+                      <button onClick={() => receiptsListRef.current?.scrollIntoView({ behavior: "smooth" })} className="text-xs font-semibold" style={{ color: TEAL }}>View all receipts</button>
+                    </div>
+                    <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
+                      {recentReceipts.map((r) => {
+                        const cat = CATEGORIES.find((c) => c.key === r.category);
+                        return (
+                          <button key={r.id} onClick={() => setEditingReceipt(r)} className="flex-shrink-0 w-36 text-left rounded-2xl p-3" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                            <div className="w-full h-16 rounded-xl flex items-center justify-center mb-2" style={{ backgroundColor: "rgba(37,99,255,0.15)" }}>{cat && <cat.icon size={22} style={{ color: TEAL }} />}</div>
+                            <div className="text-xs font-semibold text-white truncate">{r.vendor || "Untitled"}</div>
+                            <div className="text-[10px] mt-0.5" style={{ color: "#79879C" }}>{new Date(r.date).toLocaleDateString("en-AU", { day: "2-digit", month: "short" })}</div>
+                            {cat && <span className="inline-block mt-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ backgroundColor: "rgba(37,99,255,0.15)", color: TEAL }}>{cat.label}</span>}
+                            <div className="text-sm font-bold text-white tabular mt-1.5">{fmtDec(r.amount)}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {todaySuggestion && (
+                  <div className="rounded-2xl p-4 flex items-center gap-3" style={{ backgroundColor: "#14233A", border: "1px solid rgba(255,255,255,0.10)" }}>
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(37,99,255,0.15)" }}>
+                      <Sparkles size={16} style={{ color: TEAL }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEAL }}>Glovebox Insight</div>
+                      <div className="text-sm font-medium mt-0.5 text-white">{todaySuggestion.text}</div>
+                    </div>
+                    <button onClick={todaySuggestion.action} className="px-3.5 py-1.5 rounded-full text-xs font-semibold flex-shrink-0 transition hover:brightness-110" style={{ backgroundColor: TEAL, color: "#fff" }}>
+                      Add now
+                    </button>
+                  </div>
+                )}
+
+                <button onClick={() => setTab("settings")} className="w-full flex items-center justify-between px-5 py-4 rounded-2xl border text-left transition" style={{ borderColor: "rgba(255,255,255,0.10)", backgroundColor: "#0D1B2E" }}>
+                  <span className="text-sm font-semibold text-white">Your details & other deductions</span>
+                  <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: TEAL }}>Edit in Settings<ChevronRight size={14} /></span>
+                </button>
+
+                <div className="rounded-2xl p-2 sm:p-4" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div ref={receiptsListRef} style={{ scrollMarginTop: "80px" }} />
+                  {showReceiptFilters && (
+                    <div className="flex items-center gap-2 flex-wrap px-2 pt-2 pb-3">
+                      <button onClick={() => setReceiptCategoryFilter("all")} className="px-3 py-1.5 rounded-full text-xs font-medium transition" style={receiptCategoryFilter === "all" ? { backgroundColor: TEAL, color: "#fff" } : { backgroundColor: "rgba(255,255,255,0.08)", color: "#AEB9CB" }}>All work expenses</button>
+                      {CATEGORIES.map((c) => (
+                        <button key={c.key} onClick={() => setReceiptCategoryFilter(c.key)} className="px-3 py-1.5 rounded-full text-xs font-medium transition" style={receiptCategoryFilter === c.key ? { backgroundColor: TEAL, color: "#fff" } : { backgroundColor: "rgba(255,255,255,0.08)", color: "#AEB9CB" }}>{c.label}</button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="px-2">
+                    {filteredReceipts.filter((r) => receiptCategoryFilter !== "all" || r.category !== "vehicle").length === 0 ? (
+                      <div className="py-10 text-center">
+                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: "rgba(37,99,255,0.15)" }}><Wrench size={20} style={{ color: TEAL }} /></div>
+                        <p className="text-sm font-semibold text-white">Nothing here yet</p>
+                        <p className="text-xs mt-1" style={{ color: "#79879C" }}>Tap the + button to scan a receipt straight into this category.</p>
+                      </div>
+                    ) : (
+                      filteredReceipts.filter((r) => receiptCategoryFilter !== "all" || r.category !== "vehicle").map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} onEdit={setEditingReceipt} dark />)
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
