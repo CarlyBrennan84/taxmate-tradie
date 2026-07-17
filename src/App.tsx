@@ -75,6 +75,7 @@ const RECEIPT_SCANNER_URL = import.meta.env.VITE_RECEIPT_SCANNER_URL;
 const ASSISTANT_URL = RECEIPT_SCANNER_URL ? `${RECEIPT_SCANNER_URL.replace(/\/$/, "")}/assistant` : undefined;
 const TRANSCRIBE_URL = RECEIPT_SCANNER_URL ? `${RECEIPT_SCANNER_URL.replace(/\/$/, "")}/transcribe` : undefined;
 const DISTANCE_URL = RECEIPT_SCANNER_URL ? `${RECEIPT_SCANNER_URL.replace(/\/$/, "")}/distance` : undefined;
+const PLACES_URL = RECEIPT_SCANNER_URL ? `${RECEIPT_SCANNER_URL.replace(/\/$/, "")}/places` : undefined;
 const VOICE_SUPPORTED = typeof window !== "undefined" && typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== "undefined";
 
 interface AssistantMessage { role: "user" | "assistant"; content: any[] }
@@ -462,7 +463,7 @@ function ReceiptRow({ r, onDelete, onEdit }: { r: ReceiptT; onDelete: (id: strin
 const TRIP_PURPOSES = ["Site Visit", "Materials", "Supplier", "Quote", "Office", "Training", "Meeting", "Other"];
 const darkFieldBg = { backgroundColor: "#14233A", borderColor: "rgba(255,255,255,0.10)" };
 
-function LogTripScreen({ onSaveTrips, onClose, homeAddress }: { onSaveTrips: (trips: Trip[]) => void; onClose: () => void; homeAddress?: string }) {
+function LogTripScreen({ onSaveTrips, onClose, homeAddress, assumeRoundTrip }: { onSaveTrips: (trips: Trip[]) => void; onClose: () => void; homeAddress?: string; assumeRoundTrip?: boolean }) {
   const [activeTab, setActiveTab] = useState<"manual" | "auto">("manual");
   const [date, setDate] = useState(todayISO());
   const [startLocation, setStartLocation] = useState(homeAddress || "");
@@ -474,11 +475,53 @@ function LogTripScreen({ onSaveTrips, onClose, homeAddress }: { onSaveTrips: (tr
   const [classification, setClassification] = useState<"work" | "personal" | "mixed">("work");
   const [mixedPct, setMixedPct] = useState(70);
   const [saved, setSaved] = useState(false);
+  const [roundTrip, setRoundTrip] = useState(assumeRoundTrip !== false);
+  const lastOneWayKm = useRef<number | null>(null);
+
+  const [startSuggestions, setStartSuggestions] = useState<string[]>([]);
+  const [endSuggestions, setEndSuggestions] = useState<string[]>([]);
+  const startDebounceRef = useRef<number | null>(null);
+  const endDebounceRef = useRef<number | null>(null);
 
   const kmNum = parseFloat(km) || 0;
   const canSave = kmNum > 0;
   const businessKmForThisTrip = classification === "work" ? kmNum : classification === "mixed" ? kmNum * (mixedPct / 100) : 0;
   const estimatedDeduction = businessKmForThisTrip * CENTS_PER_KM_RATE;
+
+  const fetchSuggestions = async (input: string, setter: (s: string[]) => void) => {
+    if (!PLACES_URL || input.trim().length < 3) { setter([]); return; }
+    try {
+      const res = await fetch(PLACES_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input }),
+      });
+      const data = await res.json();
+      setter((data.predictions || []).map((p: { description: string }) => p.description));
+    } catch {
+      setter([]);
+    }
+  };
+
+  const handleStartChange = (v: string) => {
+    setStartLocation(v);
+    if (startDebounceRef.current) window.clearTimeout(startDebounceRef.current);
+    startDebounceRef.current = window.setTimeout(() => fetchSuggestions(v, setStartSuggestions), 300);
+  };
+
+  const handleEndChange = (v: string) => {
+    setEndLocation(v);
+    if (endDebounceRef.current) window.clearTimeout(endDebounceRef.current);
+    endDebounceRef.current = window.setTimeout(() => fetchSuggestions(v, setEndSuggestions), 300);
+  };
+
+  const toggleRoundTrip = () => {
+    const next = !roundTrip;
+    setRoundTrip(next);
+    if (lastOneWayKm.current != null) {
+      setKm(String(Math.round(lastOneWayKm.current * (next ? 2 : 1) * 10) / 10));
+    }
+  };
 
   const calcDistance = async () => {
     if (!DISTANCE_URL || !startLocation.trim() || !endLocation.trim()) return;
@@ -492,7 +535,8 @@ function LogTripScreen({ onSaveTrips, onClose, homeAddress }: { onSaveTrips: (tr
       });
       const data = await res.json();
       if (!res.ok || !data.distanceKm) { setCalcError(data.error || "Couldn't calculate distance."); return; }
-      setKm(String(data.distanceKm));
+      lastOneWayKm.current = data.distanceKm;
+      setKm(String(roundTrip ? Math.round(data.distanceKm * 2 * 10) / 10 : data.distanceKm));
     } catch {
       setCalcError("Distance lookup failed — check your connection.");
     } finally {
@@ -586,17 +630,67 @@ function LogTripScreen({ onSaveTrips, onClose, homeAddress }: { onSaveTrips: (tr
               <DarkField label="Start location">
                 <div className="relative">
                   <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#B7C5D8" }} />
-                  <input value={startLocation} onChange={(e) => setStartLocation(e.target.value)} placeholder="Home" className={darkInputCls + " pl-9 pr-9"} style={darkFieldBg} />
+                  <input
+                    value={startLocation}
+                    onChange={(e) => handleStartChange(e.target.value)}
+                    onBlur={() => window.setTimeout(() => setStartSuggestions([]), 150)}
+                    placeholder="Home"
+                    className={darkInputCls + " pl-9 pr-9"}
+                    style={darkFieldBg}
+                    autoComplete="off"
+                  />
                   <Crosshair size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#B7C5D8" }} />
+                  {startSuggestions.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-1 rounded-xl overflow-hidden z-10 shadow-lg" style={{ backgroundColor: "#14233A", border: "1px solid rgba(255,255,255,0.12)" }}>
+                      {startSuggestions.map((s) => (
+                        <button key={s} onClick={() => { setStartLocation(s); setStartSuggestions([]); }} className="w-full text-left px-3 py-2.5 text-sm text-white hover:bg-white/5 transition flex items-center gap-2">
+                          <MapPin size={14} style={{ color: "#B7C5D8" }} className="flex-shrink-0" />
+                          <span className="truncate">{s}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </DarkField>
               <DarkField label="End location">
                 <div className="relative">
                   <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#B7C5D8" }} />
-                  <input value={endLocation} onChange={(e) => setEndLocation(e.target.value)} placeholder="e.g. Client Site — Richmond" className={darkInputCls + " pl-9 pr-9"} style={darkFieldBg} />
+                  <input
+                    value={endLocation}
+                    onChange={(e) => handleEndChange(e.target.value)}
+                    onBlur={() => window.setTimeout(() => setEndSuggestions([]), 150)}
+                    placeholder="e.g. Client Site — Richmond"
+                    className={darkInputCls + " pl-9 pr-9"}
+                    style={darkFieldBg}
+                    autoComplete="off"
+                  />
                   <Crosshair size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#B7C5D8" }} />
+                  {endSuggestions.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-1 rounded-xl overflow-hidden z-10 shadow-lg" style={{ backgroundColor: "#14233A", border: "1px solid rgba(255,255,255,0.12)" }}>
+                      {endSuggestions.map((s) => (
+                        <button key={s} onClick={() => { setEndLocation(s); setEndSuggestions([]); }} className="w-full text-left px-3 py-2.5 text-sm text-white hover:bg-white/5 transition flex items-center gap-2">
+                          <MapPin size={14} style={{ color: "#B7C5D8" }} className="flex-shrink-0" />
+                          <span className="truncate">{s}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </DarkField>
+
+              <div className="flex items-center justify-between rounded-xl px-3 py-2.5" style={darkFieldBg}>
+                <div className="flex items-center gap-2">
+                  <RefreshCw size={15} style={{ color: "#B7C5D8" }} />
+                  <div>
+                    <div className="text-sm font-medium text-white">Round trip</div>
+                    <div className="text-[11px]" style={{ color: "#B7C5D8" }}>Doubles the distance for the return leg</div>
+                  </div>
+                </div>
+                <button onClick={toggleRoundTrip} role="switch" aria-checked={roundTrip} aria-label="Round trip" className="relative w-11 h-6 rounded-full transition flex-shrink-0" style={{ backgroundColor: roundTrip ? TEAL : "rgba(255,255,255,0.14)" }}>
+                  <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: roundTrip ? "22px" : "2px" }} />
+                </button>
+              </div>
+
               <DarkField label="Purpose">
                 <div className="relative">
                   <FileText size={16} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#B7C5D8" }} />
@@ -2346,7 +2440,7 @@ export default function App() {
       )}
 
       {showTripForm && (
-        <LogTripScreen onSaveTrips={addTrips} onClose={() => setShowTripForm(false)} homeAddress={activeData.profile.homeAddress} />
+        <LogTripScreen onSaveTrips={addTrips} onClose={() => setShowTripForm(false)} homeAddress={activeData.profile.homeAddress} assumeRoundTrip={activeData.profile.assumeRoundTrip} />
       )}
 
       {!showReceiptForm && !showTripForm && !editingReceipt && !assistantOpen && (

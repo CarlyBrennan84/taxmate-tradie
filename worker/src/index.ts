@@ -312,6 +312,43 @@ async function handleDistance(request: Request, env: Env, origin: string | null)
   }
 }
 
+async function handlePlaces(request: Request, env: Env, origin: string | null): Promise<Response> {
+  let body: { input?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON body" }, 400, origin);
+  }
+
+  const input = (body.input || "").trim();
+  if (input.length < 3) {
+    return json({ predictions: [] }, 200, origin);
+  }
+
+  try {
+    const url = new URL("https://maps.googleapis.com/maps/api/place/autocomplete/json");
+    url.searchParams.set("input", input);
+    url.searchParams.set("components", "country:au");
+    url.searchParams.set("key", env.GOOGLE_MAPS_API_KEY);
+
+    const res = await fetch(url.toString());
+    const data: any = await res.json();
+
+    if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+      return json({ predictions: [], error: data.error_message || data.status }, 200, origin);
+    }
+
+    const predictions = (data.predictions || [])
+      .slice(0, 5)
+      .map((p: any) => ({ description: p.description as string, placeId: p.place_id as string }));
+
+    return json({ predictions }, 200, origin);
+  } catch (err) {
+    console.error("Places autocomplete failed", err);
+    return json({ predictions: [], error: "Address lookup failed" }, 502, origin);
+  }
+}
+
 async function handleAssistant(request: Request, env: Env, origin: string | null): Promise<Response> {
   let body: { messages?: Anthropic.MessageParam[]; context?: AssistantContext };
   try {
@@ -368,6 +405,9 @@ export default {
     }
     if (pathname === "/distance") {
       return handleDistance(request, env, origin);
+    }
+    if (pathname === "/places") {
+      return handlePlaces(request, env, origin);
     }
     return handleScanReceipt(request, env, origin);
   },
