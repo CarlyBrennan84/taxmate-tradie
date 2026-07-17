@@ -6,7 +6,7 @@ import {
   Check, CheckCircle2, AlertTriangle, Fuel, Upload, ShieldCheck, X,
   Search, SlidersHorizontal, Send, Mic, LogOut, Landmark,
   Info, Wallet, Bell, MoreHorizontal, WashingMachine, Settings as SettingsIcon,
-  Zap, Image as ImageIcon, RefreshCw,
+  Zap, Image as ImageIcon, RefreshCw, Calendar, Crosshair, Loader2,
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import type { AppData, Receipt as ReceiptT, Trip, CategoryKey, Profile } from "./types";
@@ -213,7 +213,17 @@ export function Field({ label, children }: { label: string; children: React.Reac
   );
 }
 
+export function DarkField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="block text-xs font-medium mb-1.5" style={{ color: "#B7C5D8" }}>{label}</span>
+      {children}
+    </label>
+  );
+}
+
 export const inputCls = "w-full rounded-xl border border-[#E7E9EE] bg-[#FBFBFC] px-3 py-2 text-sm text-[#010818] focus:outline-none focus:ring-2 focus:ring-teal focus:border-transparent transition disabled:opacity-50 disabled:cursor-not-allowed";
+export const darkInputCls = "w-full rounded-xl border px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal focus:border-transparent transition disabled:opacity-50 disabled:cursor-not-allowed";
 
 export function EmptyState({ icon: Icon, title, subtitle, action }: { icon: React.ElementType; title: string; subtitle: string; action?: React.ReactNode }) {
   return (
@@ -252,8 +262,6 @@ function RadialProgress({
   );
 }
 
-const darkInputCls = "w-full rounded-xl border px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal focus:border-transparent transition disabled:opacity-50 disabled:cursor-not-allowed";
-
 function ReceiptForm({ onSave, onCancel, categoryLock, initial, dark }: { onSave: (r: ReceiptT) => void; onCancel: () => void; categoryLock?: CategoryKey; initial?: ReceiptT; dark?: boolean }) {
   const [r, setR] = useState<{ id: string; date: string; vendor: string; category: CategoryKey; amount: string; workPct: string; filed: boolean; notes: string }>(
     initial
@@ -264,12 +272,6 @@ function ReceiptForm({ onSave, onCancel, categoryLock, initial, dark }: { onSave
   const set = <K extends keyof typeof r>(k: K, v: (typeof r)[K]) => setR((p) => ({ ...p, [k]: v }));
   const fieldCls = dark ? darkInputCls : inputCls;
   const fieldStyle = dark ? { backgroundColor: "#0D1B2E", borderColor: "rgba(255,255,255,0.14)" } : undefined;
-  const DarkField = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <label className="block">
-      <span className="block text-xs font-medium mb-1.5" style={{ color: "#B7C5D8" }}>{label}</span>
-      {children}
-    </label>
-  );
   const F = dark ? DarkField : Field;
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 rounded-2xl border" style={dark ? { borderColor: "rgba(255,255,255,0.10)", backgroundColor: "#14233A" } : { borderColor: GREY_LINE, backgroundColor: "#FBFBFC" }}>
@@ -457,41 +459,213 @@ function ReceiptRow({ r, onDelete, onEdit }: { r: ReceiptT; onDelete: (id: strin
   );
 }
 
-function TripForm({ onSave, onCancel }: { onSave: (t: Trip) => void; onCancel: () => void }) {
-  const [t, setT] = useState<{ id: string; date: string; purpose: string; type: "business" | "personal"; km: string }>({
-    id: uid(), date: todayISO(), purpose: "", type: "business", km: "",
-  });
-  const kmRef = useRef<HTMLInputElement>(null);
-  useEffect(() => { kmRef.current?.focus(); }, []);
-  const set = <K extends keyof typeof t>(k: K, v: (typeof t)[K]) => setT((p) => ({ ...p, [k]: v }));
-  const canSave = (parseFloat(t.km) || 0) > 0;
+const TRIP_PURPOSES = ["Site Visit", "Materials", "Supplier", "Quote", "Office", "Training", "Meeting", "Other"];
+const darkFieldBg = { backgroundColor: "#14233A", borderColor: "rgba(255,255,255,0.10)" };
+
+function LogTripScreen({ onSaveTrips, onClose, homeAddress }: { onSaveTrips: (trips: Trip[]) => void; onClose: () => void; homeAddress?: string }) {
+  const [activeTab, setActiveTab] = useState<"manual" | "auto">("manual");
+  const [date, setDate] = useState(todayISO());
+  const [startLocation, setStartLocation] = useState(homeAddress || "");
+  const [endLocation, setEndLocation] = useState("");
+  const [purpose, setPurpose] = useState("");
+  const [km, setKm] = useState("");
+  const [calculating, setCalculating] = useState(false);
+  const [calcError, setCalcError] = useState<string | null>(null);
+  const [classification, setClassification] = useState<"work" | "personal" | "mixed">("work");
+  const [mixedPct, setMixedPct] = useState(70);
+  const [saved, setSaved] = useState(false);
+
+  const kmNum = parseFloat(km) || 0;
+  const canSave = kmNum > 0;
+  const businessKmForThisTrip = classification === "work" ? kmNum : classification === "mixed" ? kmNum * (mixedPct / 100) : 0;
+  const estimatedDeduction = businessKmForThisTrip * CENTS_PER_KM_RATE;
+
+  const calcDistance = async () => {
+    if (!DISTANCE_URL || !startLocation.trim() || !endLocation.trim()) return;
+    setCalculating(true);
+    setCalcError(null);
+    try {
+      const res = await fetch(DISTANCE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ origin: startLocation, destination: endLocation }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.distanceKm) { setCalcError(data.error || "Couldn't calculate distance."); return; }
+      setKm(String(data.distanceKm));
+    } catch {
+      setCalcError("Distance lookup failed — check your connection.");
+    } finally {
+      setCalculating(false);
+    }
+  };
+
+  const handleSave = () => {
+    if (!canSave) return;
+    const basePurpose = purpose.trim() || (startLocation && endLocation ? `${startLocation} → ${endLocation}` : "Trip");
+    let trips: Trip[];
+    if (classification === "mixed") {
+      const businessKm = Math.round(kmNum * (mixedPct / 100) * 10) / 10;
+      const personalKm = Math.round((kmNum - businessKm) * 10) / 10;
+      trips = [
+        { id: uid(), date, purpose: `${basePurpose} (${mixedPct}% business)`, type: "business", km: businessKm },
+        { id: uid(), date, purpose: `${basePurpose} (${100 - mixedPct}% personal)`, type: "personal", km: personalKm },
+      ];
+    } else {
+      trips = [{ id: uid(), date, purpose: basePurpose, type: classification === "work" ? "business" : "personal", km: kmNum }];
+    }
+    onSaveTrips(trips);
+    setSaved(true);
+    window.setTimeout(onClose, 1500);
+  };
+
+  const insight =
+    classification === "work"
+      ? { text: "Work trips are generally deductible.", sub: kmNum > 0 ? `Estimated deduction +${fmtDec(estimatedDeduction)}` : undefined }
+      : classification === "mixed"
+      ? { text: `${mixedPct}% of this trip counts as a business deduction.`, sub: kmNum > 0 ? `Estimated deduction +${fmtDec(estimatedDeduction)}` : undefined }
+      : { text: "Personal trips aren't tax deductible.", sub: undefined };
+
+  if (saved) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center" style={{ backgroundColor: "#081425" }}>
+        <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: GREEN_TINT }}>
+          <Check size={28} color={GREEN_DARK} />
+        </div>
+        <div className="text-lg font-bold text-white">Trip Saved</div>
+        <div className="mt-5 flex gap-10 text-center">
+          <div>
+            <div className="text-xs" style={{ color: "#B7C5D8" }}>Distance</div>
+            <div className="text-xl font-bold text-white tabular mt-1">{kmNum.toFixed(1)} km</div>
+          </div>
+          {estimatedDeduction > 0 && (
+            <div>
+              <div className="text-xs" style={{ color: "#B7C5D8" }}>Estimated tax benefit</div>
+              <div className="text-xl font-bold tabular mt-1" style={{ color: GREEN }}>+{fmtDec(estimatedDeduction)}</div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-5 rounded-2xl border bg-white" style={{ borderColor: GREY_LINE }}>
-      <span className="text-sm font-semibold" style={{ color: NAVY }}>Log a trip</span>
-      <div className="grid grid-cols-2 gap-3 mt-4">
-        <button onClick={() => set("type", "business")} className="py-3 rounded-xl text-sm font-semibold border transition" style={t.type === "business" ? { backgroundColor: TEAL, borderColor: TEAL, color: "#fff" } : { borderColor: GREY_LINE, color: NAVY, backgroundColor: "#FBFBFC" }}>Business</button>
-        <button onClick={() => set("type", "personal")} className="py-3 rounded-xl text-sm font-semibold border transition" style={t.type === "personal" ? { backgroundColor: NAVY, borderColor: NAVY, color: "#fff" } : { borderColor: GREY_LINE, color: NAVY, backgroundColor: "#FBFBFC" }}>Personal</button>
+    <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: "#081425" }}>
+      <div className="flex items-center justify-between px-4" style={{ paddingTop: "max(16px, env(safe-area-inset-top))" }}>
+        <button onClick={onClose} className="p-2 -ml-2 text-white" aria-label="Back"><ChevronLeft size={24} /></button>
+        <span className="text-lg font-bold text-white">Log Trip</span>
+        <div className="w-9" />
       </div>
-      <div className="mt-3">
-        <Field label="Kilometres">
-          <input ref={kmRef} type="number" step="0.1" inputMode="decimal" value={t.km} onChange={(e) => set("km", e.target.value)} placeholder="0.0" className={`${inputCls} text-2xl font-bold py-3 tabular`} />
-        </Field>
+
+      <div className="flex-1 overflow-y-auto px-4 pb-4 mt-4 min-h-0">
+        <div className="grid grid-cols-2 rounded-xl p-1" style={{ backgroundColor: "#0D1B2E" }}>
+          <button onClick={() => setActiveTab("manual")} className="py-2.5 rounded-lg text-sm font-semibold transition" style={activeTab === "manual" ? { backgroundColor: "rgba(37,99,255,0.15)", color: TEAL } : { color: "#B7C5D8" }}>Manual Entry</button>
+          <button onClick={() => setActiveTab("auto")} className="py-2.5 rounded-lg text-sm font-semibold transition" style={activeTab === "auto" ? { backgroundColor: "rgba(37,99,255,0.15)", color: TEAL } : { color: "#B7C5D8" }}>Auto Tracking</button>
+        </div>
+
+        {activeTab === "auto" ? (
+          <div className="mt-4 rounded-2xl p-6 text-center" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: "#14233A" }}>
+              <MapPin size={22} style={{ color: "#B7C5D8" }} />
+            </div>
+            <div className="text-sm font-semibold text-white">Auto Tracking isn't available yet</div>
+            <p className="text-xs mt-2 leading-relaxed" style={{ color: "#B7C5D8" }}>
+              Automatically detecting trips needs background location access, which a web browser can't do reliably. Use Manual Entry for now.
+            </p>
+            <button onClick={() => setActiveTab("manual")} className="mt-4 px-4 py-2 rounded-xl text-sm font-semibold text-white" style={{ backgroundColor: TEAL }}>Switch to Manual Entry</button>
+          </div>
+        ) : (
+          <>
+            <div className="mt-4 rounded-2xl p-4 space-y-4" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <DarkField label="Date">
+                <div className="relative">
+                  <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#B7C5D8" }} />
+                  <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={darkInputCls + " pl-9"} style={darkFieldBg} />
+                </div>
+              </DarkField>
+              <DarkField label="Start location">
+                <div className="relative">
+                  <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#B7C5D8" }} />
+                  <input value={startLocation} onChange={(e) => setStartLocation(e.target.value)} placeholder="Home" className={darkInputCls + " pl-9 pr-9"} style={darkFieldBg} />
+                  <Crosshair size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#B7C5D8" }} />
+                </div>
+              </DarkField>
+              <DarkField label="End location">
+                <div className="relative">
+                  <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#B7C5D8" }} />
+                  <input value={endLocation} onChange={(e) => setEndLocation(e.target.value)} placeholder="e.g. Client Site — Richmond" className={darkInputCls + " pl-9 pr-9"} style={darkFieldBg} />
+                  <Crosshair size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#B7C5D8" }} />
+                </div>
+              </DarkField>
+              <DarkField label="Purpose">
+                <div className="relative">
+                  <FileText size={16} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#B7C5D8" }} />
+                  <input list="tripPurposes" value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="Site inspection" className={darkInputCls + " pl-9"} style={darkFieldBg} />
+                  <datalist id="tripPurposes">
+                    {TRIP_PURPOSES.map((p) => <option key={p} value={p} />)}
+                  </datalist>
+                </div>
+              </DarkField>
+
+              {DISTANCE_URL && startLocation.trim() && endLocation.trim() && (
+                <button onClick={calcDistance} disabled={calculating} className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold transition disabled:opacity-60" style={{ backgroundColor: "rgba(37,99,255,0.12)", color: TEAL }}>
+                  {calculating ? <><Loader2 size={14} className="animate-spin" />Calculating…</> : <><Crosshair size={14} />Calculate distance</>}
+                </button>
+              )}
+              {calcError && <p className="text-xs" style={{ color: AMBER }}>{calcError}</p>}
+
+              <div className="pt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                <div className="pt-3">
+                  <DarkField label="Distance travelled (km)">
+                    <input type="number" step="0.1" inputMode="decimal" value={km} onChange={(e) => setKm(e.target.value)} placeholder="0.0" className={darkInputCls + " text-2xl font-bold py-3 tabular"} style={{ ...darkFieldBg, color: TEAL }} />
+                  </DarkField>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-2xl p-4" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <div className="text-sm font-semibold text-white mb-3">Classification</div>
+              <div className="grid grid-cols-3 gap-2">
+                {([{ key: "work", label: "Work" }, { key: "personal", label: "Personal" }, { key: "mixed", label: "Mixed" }] as const).map((c) => (
+                  <button key={c.key} onClick={() => setClassification(c.key)} className="py-2.5 rounded-xl text-sm font-semibold border transition" style={classification === c.key ? { backgroundColor: TEAL, borderColor: TEAL, color: "#fff" } : { backgroundColor: "transparent", borderColor: "rgba(255,255,255,0.14)", color: "#fff" }}>
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+              {classification === "mixed" && (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: "#B7C5D8" }}>
+                    <span>Business %</span>
+                    <span className="font-semibold text-white">{mixedPct}%</span>
+                  </div>
+                  <input type="range" min={0} max={100} value={mixedPct} onChange={(e) => setMixedPct(Number(e.target.value))} className="w-full" style={{ accentColor: TEAL }} />
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 rounded-2xl p-4 flex items-start gap-3" style={{ backgroundColor: "#14233A", border: "1px solid rgba(255,255,255,0.10)" }}>
+              <CheckCircle2 size={18} style={{ color: GREEN }} className="flex-shrink-0 mt-0.5" />
+              <div>
+                <div className="text-sm text-white">{insight.text}</div>
+                {insight.sub && <div className="text-sm font-bold mt-1" style={{ color: GREEN }}>{insight.sub}</div>}
+              </div>
+            </div>
+          </>
+        )}
       </div>
-      <div className="grid grid-cols-2 gap-3 mt-3">
-        <Field label="Purpose (optional)"><input value={t.purpose} onChange={(e) => set("purpose", e.target.value)} placeholder="Site visit — Preston" className={inputCls} /></Field>
-        <Field label="Date"><input type="date" value={t.date} onChange={(e) => set("date", e.target.value)} className={inputCls} /></Field>
-      </div>
-      <div className="flex justify-end gap-2 pt-4">
-        <button onClick={onCancel} className="px-4 py-2 rounded-xl text-sm font-medium text-[#5B6472] hover:bg-[#F0F1F4] transition">Cancel</button>
-        <button
-          onClick={() => { if (!canSave) return; onSave({ id: t.id, date: t.date, purpose: t.purpose, type: t.type, km: parseFloat(t.km) || 0 }); }}
-          disabled={!canSave}
-          className="px-4 py-2 rounded-xl text-sm font-semibold text-white shadow-sm hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{ backgroundColor: TEAL }}
-        >
-          Log trip
-        </button>
-      </div>
+
+      {activeTab === "manual" && (
+        <div className="px-4" style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom))" }}>
+          <button
+            onClick={() => { if (navigator.vibrate) navigator.vibrate(10); handleSave(); }}
+            disabled={!canSave}
+            className="w-full py-4 rounded-2xl text-base font-bold text-white transition disabled:opacity-40"
+            style={{ backgroundColor: TEAL }}
+          >
+            Save Trip
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -2172,11 +2346,7 @@ export default function App() {
       )}
 
       {showTripForm && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4" onClick={() => setShowTripForm(false)}>
-          <div className="w-full sm:max-w-md" onClick={(e) => e.stopPropagation()}>
-            <TripForm onSave={addTrip} onCancel={() => setShowTripForm(false)} />
-          </div>
-        </div>
+        <LogTripScreen onSaveTrips={addTrips} onClose={() => setShowTripForm(false)} homeAddress={activeData.profile.homeAddress} />
       )}
 
       {!showReceiptForm && !showTripForm && !editingReceipt && !assistantOpen && (
