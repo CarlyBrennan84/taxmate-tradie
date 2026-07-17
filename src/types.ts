@@ -47,6 +47,7 @@ export interface Profile {
   homeAddress?: string;
   lastWorksite?: string;
   assumeRoundTrip?: boolean;
+  reviewedNoTravelDates?: string[];
 }
 
 export interface AppData {

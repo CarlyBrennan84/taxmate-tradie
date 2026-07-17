@@ -6,7 +6,7 @@ import {
   Check, CheckCircle2, AlertTriangle, Fuel, Upload, ShieldCheck, X,
   Search, SlidersHorizontal, Send, Mic, LogOut, Landmark,
   Info, Wallet, Bell, MoreHorizontal, WashingMachine, Settings as SettingsIcon,
-  Zap, Image as ImageIcon, RefreshCw, Calendar, Crosshair, Loader2,
+  Zap, Image as ImageIcon, RefreshCw, Calendar, Crosshair, Loader2, Gauge,
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import type { AppData, Receipt as ReceiptT, Trip, CategoryKey, Profile } from "./types";
@@ -463,9 +463,9 @@ function ReceiptRow({ r, onDelete, onEdit }: { r: ReceiptT; onDelete: (id: strin
 const TRIP_PURPOSES = ["Site Visit", "Materials", "Supplier", "Quote", "Office", "Training", "Meeting", "Other"];
 const darkFieldBg = { backgroundColor: "#14233A", borderColor: "rgba(255,255,255,0.10)" };
 
-function LogTripScreen({ onSaveTrips, onClose, homeAddress, assumeRoundTrip }: { onSaveTrips: (trips: Trip[]) => void; onClose: () => void; homeAddress?: string; assumeRoundTrip?: boolean }) {
+function LogTripScreen({ onSaveTrips, onClose, homeAddress, assumeRoundTrip, initialDate }: { onSaveTrips: (trips: Trip[]) => void; onClose: () => void; homeAddress?: string; assumeRoundTrip?: boolean; initialDate?: string }) {
   const [activeTab, setActiveTab] = useState<"manual" | "auto">("manual");
-  const [date, setDate] = useState(todayISO());
+  const [date, setDate] = useState(initialDate || todayISO());
   const [startLocation, setStartLocation] = useState(homeAddress || "");
   const [endLocation, setEndLocation] = useState("");
   const [purpose, setPurpose] = useState("");
@@ -764,11 +764,11 @@ function LogTripScreen({ onSaveTrips, onClose, homeAddress, assumeRoundTrip }: {
   );
 }
 
-function AnimatedBar({ pct, color = TEAL }: { pct: number; color?: string }) {
+function AnimatedBar({ pct, color = TEAL, trackColor = "#EEF0F4" }: { pct: number; color?: string; trackColor?: string }) {
   const [width, setWidth] = useState(0);
   useEffect(() => { const t = window.setTimeout(() => setWidth(pct), 120); return () => window.clearTimeout(t); }, [pct]);
   return (
-    <div className="w-full h-2 rounded-full bg-[#EEF0F4] overflow-hidden">
+    <div className="w-full h-2 rounded-full overflow-hidden" style={{ backgroundColor: trackColor }}>
       <div className="h-full rounded-full transition-all duration-700" style={{ width: `${width * 100}%`, backgroundColor: color }} />
     </div>
   );
@@ -1114,36 +1114,6 @@ function ReadinessItem({ ok, title, detail, cta, onGo }: { ok: boolean; title: s
   );
 }
 
-function MethodCompareCard({ centsPerKmEstimate, logbookEstimate, logbookReady, businessKm }: { centsPerKmEstimate: number; logbookEstimate: number; logbookReady: boolean; businessKm: number }) {
-  const recommendLogbook = logbookReady && logbookEstimate >= centsPerKmEstimate;
-  const capped = businessKm > CENTS_PER_KM_CAP_KM;
-  return (
-    <Card className="p-5">
-      <SectionTitle title="Recommended method" eyebrow="Cents/km vs logbook" />
-      <div className="grid grid-cols-2 gap-3 mb-3">
-        <div className="p-3 rounded-xl border" style={{ borderColor: !recommendLogbook && logbookReady ? TEAL : GREY_LINE, backgroundColor: !recommendLogbook && logbookReady ? TEAL_TINT : "#FBFBFC" }}>
-          <div className="text-[11px] font-medium" style={{ color: "#8A93A3" }}>Cents per km</div>
-          <div className="text-lg font-bold tabular mt-0.5" style={{ color: NAVY }}>{fmt(centsPerKmEstimate)}</div>
-          <div className="text-[10px] mt-0.5" style={{ color: "#8A93A3" }}>{Math.min(businessKm, CENTS_PER_KM_CAP_KM).toFixed(0)} km × {(CENTS_PER_KM_RATE * 100).toFixed(0)}¢{capped ? " (capped at 5,000 km)" : ""}</div>
-        </div>
-        <div className="p-3 rounded-xl border" style={{ borderColor: recommendLogbook ? TEAL : GREY_LINE, backgroundColor: recommendLogbook ? TEAL_TINT : "#FBFBFC" }}>
-          <div className="text-[11px] font-medium" style={{ color: "#8A93A3" }}>Logbook method</div>
-          <div className="text-lg font-bold tabular mt-0.5" style={{ color: NAVY }}>{logbookReady ? fmt(logbookEstimate) : "—"}</div>
-          <div className="text-[10px] mt-0.5" style={{ color: "#8A93A3" }}>{logbookReady ? "Business % × total car costs" : "Finish your 12-week logbook to unlock this"}</div>
-        </div>
-      </div>
-      <p className="text-xs leading-relaxed" style={{ color: "#8A93A3" }}>
-        {logbookReady
-          ? recommendLogbook
-            ? "Based on what's logged so far, the logbook method looks like the better claim — it's not capped by kilometres like cents/km is."
-            : "Based on what's logged so far, cents/km looks simpler and about as good — no need to keep tracking every vehicle expense receipt."
-          : capped
-          ? "You're already over the 5,000 km cap for cents/km — finishing your logbook could unlock a bigger, uncapped claim."
-          : "Cents/km is fine to use for now. Once your 12-week logbook is done, Glovebox will tell you if switching to the logbook method is worth more."}
-      </p>
-    </Card>
-  );
-}
 
 /* =================================================================
    AUTH
@@ -1251,6 +1221,8 @@ export default function App() {
   const [receiptSegment, setReceiptSegment] = useState<"needsAttention" | "recent" | "completed">("recent");
   const [editingReceipt, setEditingReceipt] = useState<ReceiptT | null>(null);
   const [showTripForm, setShowTripForm] = useState(false);
+  const [tripFormDate, setTripFormDate] = useState<string | null>(null);
+  const [logbookSubTab, setLogbookSubTab] = useState<"overview" | "trips" | "review">("overview");
   const [showLogbookInfo, setShowLogbookInfo] = useState(false);
   const [scanQueue, setScanQueue] = useState<ScanQueueItem[]>([]);
   const [csvPreview, setCsvPreview] = useState<Trip[] | null>(null);
@@ -1332,6 +1304,13 @@ export default function App() {
   const addTrip = (t: Trip) => { update((d) => { d.trips.unshift(t); return d; }); setShowTripForm(false); };
   const addTrips = (ts: Trip[]) => { update((d) => { d.trips = [...ts, ...d.trips]; return d; }); };
   const updateTravelProfile = (patch: Partial<Pick<Profile, "homeAddress" | "lastWorksite" | "assumeRoundTrip">>) => update((d) => { d.profile = { ...d.profile, ...patch }; return d; });
+  const markNoTravel = (iso: string) => update((d) => {
+    const existing = d.profile.reviewedNoTravelDates || [];
+    if (existing.includes(iso)) return d;
+    d.profile = { ...d.profile, reviewedNoTravelDates: [...existing, iso] };
+    return d;
+  });
+  const openTripFormFor = (iso: string | null) => { setTripFormDate(iso); setShowTripForm(true); };
   const deleteTrip = (id: string) => update((d) => { d.trips = d.trips.filter((t) => t.id !== id); return d; });
   const setProfile = <K extends keyof AppData["profile"]>(k: K, v: AppData["profile"][K]) => update((d) => { d.profile[k] = v; return d; });
   const setVehicle = <K extends keyof AppData["profile"]["vehicle"]>(k: K, v: AppData["profile"]["vehicle"][K]) => update((d) => { d.profile.vehicle[k] = v; return d; });
@@ -1436,6 +1415,47 @@ export default function App() {
   const logbookReady = logbookProgress >= 1;
   const vehicleEvidenceComplete = logbookReady && businessKm > 0;
   const currentOdometer = (Number(activeData.profile.vehicle.openingOdometer) || 0) + totalKm;
+
+  const fmtShortDate = (d: Date) => d.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
+  const REVIEW_WINDOW_DAYS = 14;
+  const todayTrips = trips.filter((t) => t.date === todayISO());
+  const todayBusinessKm = todayTrips.filter((t) => t.type === "business").reduce((s, t) => s + t.km, 0);
+  const todayPersonalKm = todayTrips.filter((t) => t.type === "personal").reduce((s, t) => s + t.km, 0);
+  const todayTotalKm = todayBusinessKm + todayPersonalKm;
+  const todayBusinessPct = todayTotalKm > 0 ? Math.round((todayBusinessKm / todayTotalKm) * 100) : 0;
+
+  const logbookStartDate = firstTripDate ? new Date(firstTripDate) : null;
+  const logbookEndDate = logbookStartDate ? new Date(logbookStartDate.getTime() + 83 * 86400000) : null;
+
+  const weekBusinessPct = (weeksAgo: number): number | null => {
+    const end = Date.now() - weeksAgo * 7 * 86400000;
+    const start = end - 7 * 86400000;
+    const weekTrips = trips.filter((t) => { const ts = new Date(t.date).getTime(); return ts > start && ts <= end; });
+    const wBiz = weekTrips.filter((t) => t.type === "business").reduce((s, t) => s + t.km, 0);
+    const wTotal = weekTrips.reduce((s, t) => s + t.km, 0);
+    return wTotal > 0 ? (wBiz / wTotal) * 100 : null;
+  };
+  const businessPctTrend = [5, 4, 3, 2, 1, 0].map(weekBusinessPct).filter((v): v is number => v !== null);
+  const businessPctTrendDelta = businessPctTrend.length >= 2 ? Math.round(businessPctTrend[businessPctTrend.length - 1] - businessPctTrend[businessPctTrend.length - 2]) : null;
+
+  const recentTrips = [...trips].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)).slice(0, 3);
+
+  const loggedDateSet = new Set(trips.map((t) => t.date));
+  const dismissedNoTravelDates = new Set(activeData.profile.reviewedNoTravelDates || []);
+  const reviewGapDays: string[] = [];
+  if (logbookStartDate) {
+    for (let i = 1; i <= REVIEW_WINDOW_DAYS; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const iso = d.toISOString().slice(0, 10);
+      if (d < logbookStartDate) continue;
+      if (logbookEndDate && d > logbookEndDate) continue;
+      if (loggedDateSet.has(iso)) continue;
+      if (dismissedNoTravelDates.has(iso)) continue;
+      reviewGapDays.push(iso);
+    }
+  }
+  reviewGapDays.sort();
 
   const buildAssistantContext = () => ({
     occupation: activeData.profile.occupation,
@@ -1608,6 +1628,10 @@ export default function App() {
   const vehicleExpenseTotal = categoryTotals.find((c) => c.key === "vehicle")?.total || 0;
   const centsPerKmEstimate = Math.min(businessKm, CENTS_PER_KM_CAP_KM) * CENTS_PER_KM_RATE;
   const logbookEstimate = (businessPct / 100) * vehicleExpenseTotal;
+  const recommendLogbookMethod = logbookReady && logbookEstimate >= centsPerKmEstimate;
+  const primaryDeductionEstimate = logbookReady ? Math.max(logbookEstimate, centsPerKmEstimate) : centsPerKmEstimate;
+  const primaryDeductionMethodLabel = logbookReady && recommendLogbookMethod ? "Using logbook method" : "Using cents/km method";
+  const deductionDeltaVsCentsPerKm = logbookReady && recommendLogbookMethod ? logbookEstimate - centsPerKmEstimate : 0;
 
   const laundryAdded = laundryEstimate > 0;
   const phonePctAdded = (Number(activeData.profile.phoneWorkPct) || 0) > 0;
@@ -1753,7 +1777,7 @@ export default function App() {
           </div>
         </aside>
 
-        {tab !== "overview" && (
+        {tab !== "overview" && tab !== "vehicle" && (
           <div className="lg:hidden fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 border-b print:hidden" style={{ backgroundColor: "#FFFFFFF2", borderColor: GREY_LINE, backdropFilter: "blur(8px)" }}>
             <div className="flex items-center gap-2">
               <img src={gloveboxLogo} alt="Glovebox" className="h-9 w-auto rounded-md" />
@@ -2026,118 +2050,321 @@ export default function App() {
           )}
 
           {tab === "vehicle" && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <SectionTitle title="Logbook" />
-                <button onClick={() => setShowLogbookInfo((v) => !v)} className="text-xs font-semibold flex items-center gap-1 flex-shrink-0" style={{ color: TEAL_DARK }}>
-                  Learn more <ChevronRight size={13} style={{ transform: showLogbookInfo ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
-                </button>
-              </div>
-
-              {showLogbookInfo && (
-                <Card className="p-4 fade-up">
-                  <p className="text-xs leading-relaxed" style={{ color: "#8A93A3" }}>Vehicle claims are usually the single largest deduction for tradies. The ATO wants a continuous 12-week period that records <b>every</b> trip — work and private, not just work journeys. Complete your 84-day logbook once — it can support your claims for up to five years while your driving pattern stays similar.</p>
-                </Card>
-              )}
-
-              <Card className="p-5" style={{ borderColor: firstTripDate ? GREY_LINE : AMBER }}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold" style={{ color: NAVY }}>Logbook progress</span>
-                  <span className="text-xs font-medium tabular" style={{ color: NAVY_SOFT }}>{Math.min(daysElapsed, 84)} / 84 days</span>
-                </div>
-                <AnimatedBar pct={logbookProgress} />
-              </Card>
-
-              <div className="grid grid-cols-2 gap-4">
-                <Card className="p-4 text-center" delay={0}><div className="text-xl font-bold tabular" style={{ color: NAVY }}>{Math.round(businessKm)} km</div><div className="text-[11px] mt-1" style={{ color: "#8A93A3" }}>Business km</div></Card>
-                <Card className="p-4 text-center" delay={40}><div className="text-xl font-bold tabular" style={{ color: NAVY }}>{Math.round(personalKm)} km</div><div className="text-[11px] mt-1" style={{ color: "#8A93A3" }}>Personal km</div></Card>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center"><span className="text-xs font-semibold tabular" style={{ color: TEAL_DARK }}>{businessPct}%</span> <span className="text-[11px]" style={{ color: "#8A93A3" }}>business use</span></div>
-                <div className="text-center"><span className="text-xs font-semibold tabular" style={{ color: NAVY_SOFT }}>{currentOdometer > 0 ? Math.round(currentOdometer).toLocaleString() : "—"}</span> <span className="text-[11px]" style={{ color: "#8A93A3" }}>est. odometer</span></div>
-              </div>
-
-              <button onClick={() => setShowTripForm(true)} className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-white font-semibold shadow-card hover:shadow-card-hover transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:not-disabled:-translate-y-0.5" style={{ backgroundColor: TEAL }}>
-                <Car size={18} />
-                Log Trip
-              </button>
-
-              <button onClick={() => setTab("settings")} className="w-full flex items-center justify-between px-5 py-4 rounded-2xl border bg-white text-left transition hover:bg-[#FBFBFC]" style={{ borderColor: GREY_LINE }}>
-                <span className="text-sm font-semibold" style={{ color: NAVY }}>Vehicle details</span>
-                <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: TEAL_DARK }}>Edit in Settings<ChevronRight size={14} /></span>
-              </button>
-
-              <Disclosure title="Recommended method">
-                <MethodCompareCard centsPerKmEstimate={centsPerKmEstimate} logbookEstimate={logbookEstimate} logbookReady={logbookReady} businessKm={businessKm} />
-              </Disclosure>
-
-              <Disclosure title="Import from Driversnote">
-                <p className="text-xs mb-3" style={{ color: "#8A93A3" }}>Export a CSV from Driversnote and drop it in — Glovebox will match up dates, distances and trip purposes.</p>
-                <button onClick={() => csvInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition disabled:opacity-50" style={{ borderColor: GREY_LINE, color: NAVY }}><Upload size={15} />Import Driversnote CSV</button>
-              </Disclosure>
-
-              {csvPreview && (
-                <Card className="p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <div className="text-sm font-semibold" style={{ color: NAVY }}>Driversnote import preview</div>
-                      <div className="text-xs mt-0.5" style={{ color: "#8A93A3" }}>{csvPreview.length} trip{csvPreview.length !== 1 ? "s" : ""} found — review before adding, business/personal may need a manual fix</div>
-                    </div>
-                    <button onClick={() => setCsvPreview(null)} className="p-1.5 rounded-lg text-[#B7BEC9] hover:bg-[#F0F1F4] transition flex-shrink-0"><X size={16} /></button>
+            <>
+            <div className="-mx-4 sm:-mx-6 lg:mx-0 -mt-[68px] lg:mt-0 min-h-screen lg:min-h-0 lg:rounded-3xl fade-up" style={{ backgroundColor: "#081425" }}>
+              <div className="px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-4 flex items-center justify-between">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}>
+                    <Zap size={18} color="#fff" fill="#fff" />
                   </div>
-                  {csvPreview.length === 0 ? (
-                    <p className="text-sm" style={{ color: "#8A93A3" }}>Couldn't find any trips in that file — check it's a CSV export with date, distance and purpose columns.</p>
-                  ) : (
-                    <>
-                      <div className="max-h-56 overflow-y-auto rounded-xl border" style={{ borderColor: GREY_LINE }}>
-                        {csvPreview.slice(0, 50).map((t) => (
-                          <div key={t.id} className="flex items-center gap-3 px-3 py-2 border-b last:border-0 text-xs" style={{ borderColor: GREY_LINE }}>
-                            <span className="tabular flex-shrink-0" style={{ color: "#8A93A3" }}>{t.date}</span>
-                            <span className="flex-1 truncate" style={{ color: NAVY }}>{t.purpose}</span>
-                            <span className="tabular font-medium flex-shrink-0" style={{ color: NAVY }}>{t.km} km</span>
-                            <Pill tone={t.type === "business" ? "teal" : "grey"}>{t.type}</Pill>
+                  <div className="min-w-0">
+                    <div className="text-xl font-bold text-white">Logbook</div>
+                    <div className="text-xs mt-0.5 truncate" style={{ color: "#79879C" }}>Track every trip. Maximise your deduction.</div>
+                  </div>
+                </div>
+                <button onClick={() => setTab("settings")} className="p-2 -mr-2 flex-shrink-0" aria-label="Settings"><SettingsIcon size={20} color="#AEB9CB" /></button>
+              </div>
+
+              <div className="px-4 sm:px-6 lg:px-6">
+                <div className="grid grid-cols-3 rounded-2xl p-1" style={{ backgroundColor: "#0D1B2E" }}>
+                  <button onClick={() => setLogbookSubTab("overview")} className="py-2.5 rounded-xl text-sm font-semibold transition" style={logbookSubTab === "overview" ? { backgroundColor: TEAL, color: "#fff" } : { color: "#AEB9CB" }}>Overview</button>
+                  <button onClick={() => setLogbookSubTab("trips")} className="py-2.5 rounded-xl text-sm font-semibold transition" style={logbookSubTab === "trips" ? { backgroundColor: TEAL, color: "#fff" } : { color: "#AEB9CB" }}>Trips</button>
+                  <button onClick={() => setLogbookSubTab("review")} className="py-2.5 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-1.5" style={logbookSubTab === "review" ? { backgroundColor: TEAL, color: "#fff" } : { color: "#AEB9CB" }}>
+                    Review Day
+                    {reviewGapDays.length > 0 && (
+                      <span className="min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center" style={{ backgroundColor: logbookSubTab === "review" ? "rgba(255,255,255,0.25)" : TEAL, color: "#fff" }}>{reviewGapDays.length}</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="px-4 sm:px-6 lg:px-6 pt-4 pb-28 lg:pb-10 space-y-4">
+                {logbookSubTab === "overview" && (
+                  <>
+                    <button onClick={() => openTripFormFor(null)} className="w-full text-left rounded-2xl p-5 pb-8 transition hover:brightness-110" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                      <div className="flex items-start justify-between mb-4">
+                        <span className="text-sm font-semibold text-white">Today's driving</span>
+                        <span className="text-xs font-semibold" style={{ color: TEAL }}>Edit today</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="text-4xl font-bold text-white tabular">{Math.round(todayTotalKm)}<span className="text-lg font-semibold ml-1" style={{ color: "#79879C" }}>km</span></div>
+                          <div className="flex items-center gap-4 mt-3 flex-wrap">
+                            <div className="flex items-center gap-1.5 text-xs" style={{ color: "#AEB9CB" }}><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: TEAL }} />Business <span className="font-semibold text-white">{Math.round(todayBusinessKm)} km</span></div>
+                            <div className="flex items-center gap-1.5 text-xs" style={{ color: "#AEB9CB" }}><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: "#3A4A66" }} />Personal <span className="font-semibold text-white">{Math.round(todayPersonalKm)} km</span></div>
+                          </div>
+                        </div>
+                        <RadialProgress pct={todayTotalKm > 0 ? todayBusinessPct / 100 : 0} label="Business use" size={92} trackColor="rgba(255,255,255,0.12)" progressColor={TEAL} textColor="#fff" labelColor="#AEB9CB" />
+                      </div>
+                    </button>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="rounded-2xl p-4" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                        <div className="text-xs" style={{ color: "#79879C" }}>Current business use</div>
+                        <div className="text-2xl font-bold text-white tabular mt-1">{businessPct}%</div>
+                        {businessPctTrendDelta !== null && (
+                          <div className="text-xs font-semibold mt-1" style={{ color: businessPctTrendDelta >= 0 ? GREEN : "#AEB9CB" }}>{businessPctTrendDelta >= 0 ? "↑" : "↓"} {Math.abs(businessPctTrendDelta)}% from last week</div>
+                        )}
+                        {businessPctTrend.length >= 2 && <div className="mt-2"><TrendSparkline points={businessPctTrend} color={TEAL} /></div>}
+                      </div>
+
+                      <div className="rounded-2xl p-4" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                        <div className="text-xs" style={{ color: "#79879C" }}>Logbook progress</div>
+                        <div className="text-2xl font-bold text-white tabular mt-1">{Math.min(daysElapsed, 84)} <span className="text-sm font-medium" style={{ color: "#79879C" }}>/ 84 days</span></div>
+                        <div className="mt-2.5"><AnimatedBar pct={logbookProgress} color={TEAL} trackColor="rgba(255,255,255,0.10)" /></div>
+                        <div className="text-[11px] font-medium mt-2" style={{ color: "#AEB9CB" }}>{Math.round(logbookProgress * 100)}% complete</div>
+                        <div className="text-[11px] mt-1 flex items-center gap-1" style={{ color: "#79879C" }}>
+                          <Calendar size={11} />
+                          {logbookStartDate && logbookEndDate ? `${fmtShortDate(logbookStartDate)} – ${fmtShortDate(logbookEndDate)}` : "Log a trip to start"}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl p-4" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                        <div className="text-xs" style={{ color: "#79879C" }}>Estimated deduction</div>
+                        <div className="text-2xl font-bold text-white tabular mt-1">{fmt(primaryDeductionEstimate)}</div>
+                        <div className="text-[11px] mt-1" style={{ color: "#79879C" }}>{primaryDeductionMethodLabel}</div>
+                        {deductionDeltaVsCentsPerKm > 0 && (
+                          <div className="mt-2 inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold" style={{ backgroundColor: "rgba(24,195,126,0.15)", color: GREEN }}>
+                            +{fmt(deductionDeltaVsCentsPerKm)} more than cents/km
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl p-4 flex items-center gap-3" style={{ backgroundColor: "#14233A", border: "1px solid rgba(255,255,255,0.10)" }}>
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(37,99,255,0.15)" }}>
+                        <Sparkles size={16} style={{ color: TEAL }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold" style={{ color: !firstTripDate || !logbookReady ? "#fff" : recommendLogbookMethod ? GREEN : "#fff" }}>
+                          {!firstTripDate
+                            ? "Log your first trip to start your 12-week logbook."
+                            : !logbookReady
+                            ? `You're ${Math.min(daysElapsed, 84)} days into your logbook — keep it going.`
+                            : recommendLogbookMethod
+                            ? "You're ahead with the logbook method!"
+                            : "Cents/km looks like the simpler claim right now."}
+                        </div>
+                        <div className="text-xs mt-0.5" style={{ color: "#AEB9CB" }}>
+                          {!firstTripDate
+                            ? "The ATO needs a continuous 84-day record to use the logbook method."
+                            : !logbookReady
+                            ? `${84 - Math.min(daysElapsed, 84)} days left before your logbook method estimate unlocks.`
+                            : recommendLogbookMethod
+                            ? "Keep logging to maximise your deduction."
+                            : "No need to keep tracking every vehicle expense receipt."}
+                        </div>
+                      </div>
+                      <button onClick={() => setLogbookSubTab("trips")} className="text-xs font-semibold flex items-center gap-1 flex-shrink-0" style={{ color: TEAL }}>View comparison<ChevronRight size={13} /></button>
+                    </div>
+
+                    <div className="rounded-2xl p-4" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-semibold text-white">Recent trips</span>
+                        <button onClick={() => setLogbookSubTab("trips")} className="text-xs font-semibold flex items-center gap-1 flex-shrink-0" style={{ color: TEAL }}>View all trips<ChevronRight size={13} /></button>
+                      </div>
+                      {recentTrips.length === 0 ? (
+                        <div className="py-8 text-center">
+                          <div className="text-sm" style={{ color: "#AEB9CB" }}>No trips logged yet</div>
+                          <div className="text-xs mt-1" style={{ color: "#79879C" }}>Tap + to log your first trip.</div>
+                        </div>
+                      ) : (
+                        recentTrips.map((t) => (
+                          <button key={t.id} onClick={() => setLogbookSubTab("trips")} className="w-full flex items-center gap-3 py-3 border-t first:border-t-0 text-left" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+                            <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: t.type === "business" ? "rgba(37,99,255,0.15)" : "rgba(255,255,255,0.06)" }}><Car size={15} style={{ color: t.type === "business" ? TEAL : "#79879C" }} /></div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-medium text-white truncate">{t.purpose || (t.type === "business" ? "Work trip" : "Personal trip")}</div>
+                              <div className="text-xs mt-0.5" style={{ color: "#79879C" }}>{t.date === todayISO() ? "Today" : new Date(t.date).toLocaleDateString("en-AU", { day: "2-digit", month: "short" })}</div>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <div className="text-sm font-semibold text-white tabular">{t.km} km</div>
+                              <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ backgroundColor: t.type === "business" ? "rgba(24,195,126,0.15)" : "rgba(255,255,255,0.08)", color: t.type === "business" ? GREEN : "#AEB9CB" }}>{t.type === "business" ? "Business" : "Personal"}</span>
+                            </div>
+                            <ChevronRight size={15} style={{ color: "#3A4A66" }} className="flex-shrink-0" />
+                          </button>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="rounded-2xl p-4" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2"><Gauge size={16} style={{ color: "#AEB9CB" }} /><span className="text-sm font-semibold text-white">Odometer</span></div>
+                        <button onClick={() => setTab("settings")} className="text-xs font-semibold" style={{ color: TEAL }}>Update</button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div><div className="text-[11px]" style={{ color: "#79879C" }}>Start</div><div className="text-base font-bold text-white tabular mt-0.5">{Math.round(activeData.profile.vehicle.openingOdometer || 0).toLocaleString()} km</div>{logbookStartDate && <div className="text-[10px] mt-0.5" style={{ color: "#79879C" }}>{fmtShortDate(logbookStartDate)}</div>}</div>
+                        <div><div className="text-[11px]" style={{ color: "#79879C" }}>Current</div><div className="text-base font-bold text-white tabular mt-0.5">{Math.round(currentOdometer).toLocaleString()} km</div><div className="text-[10px] mt-0.5" style={{ color: "#79879C" }}>Today</div></div>
+                        <div><div className="text-[11px]" style={{ color: "#79879C" }}>Distance</div><div className="text-base font-bold text-white tabular mt-0.5">{Math.round(totalKm).toLocaleString()} km</div><div className="text-[10px] mt-0.5" style={{ color: "#79879C" }}>Logged</div></div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {logbookSubTab === "trips" && (
+                  <>
+                    <button onClick={() => openTripFormFor(null)} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white font-semibold transition hover:brightness-110" style={{ backgroundColor: TEAL }}>
+                      <Car size={18} />Log Trip
+                    </button>
+
+                    <div className="rounded-2xl p-2 sm:p-4" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                      <div className="px-2 pt-2 pb-1 text-xs font-semibold" style={{ color: "#AEB9CB" }}>Trip log</div>
+                      <div className="px-2">
+                        {trips.length === 0 ? (
+                          <div className="py-10 text-center">
+                            <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: "rgba(37,99,255,0.15)" }}><Car size={20} style={{ color: TEAL }} /></div>
+                            <p className="text-sm font-semibold text-white">No trips logged yet</p>
+                            <p className="text-xs mt-1" style={{ color: "#79879C" }}>Tap Log Trip above, or import a Driversnote CSV to backfill your history.</p>
+                          </div>
+                        ) : (
+                          trips.map((t) => (
+                            <div key={t.id} className="flex items-center gap-3 py-3 border-b last:border-0" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+                              <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: t.type === "business" ? "rgba(37,99,255,0.15)" : "rgba(255,255,255,0.06)" }}><Car size={15} style={{ color: t.type === "business" ? TEAL : "#79879C" }} /></div>
+                              <div className="min-w-0 flex-1"><div className="text-sm font-medium text-white truncate">{t.purpose || (t.type === "business" ? "Work trip" : "Personal trip")}</div><div className="text-xs mt-0.5" style={{ color: "#79879C" }}>{new Date(t.date).toLocaleDateString("en-AU", { day: "2-digit", month: "short" })}</div></div>
+                              <div className="text-sm font-semibold text-white tabular">{t.km} km</div>
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold flex-shrink-0" style={{ backgroundColor: t.type === "business" ? "rgba(24,195,126,0.15)" : "rgba(255,255,255,0.08)", color: t.type === "business" ? GREEN : "#AEB9CB" }}>{t.type === "business" ? "Business" : "Personal"}</span>
+                              <button onClick={() => deleteTrip(t.id)} className="p-1.5 rounded-lg transition flex-shrink-0" style={{ color: "#5B6980" }}><Trash2 size={15} /></button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl p-4" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-semibold text-white">Recommended method</span>
+                        <button onClick={() => setShowLogbookInfo((v) => !v)} className="text-xs font-semibold flex items-center gap-1 flex-shrink-0" style={{ color: TEAL }}>
+                          Learn more <ChevronRight size={13} style={{ transform: showLogbookInfo ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
+                        </button>
+                      </div>
+                      {showLogbookInfo && (
+                        <p className="text-xs leading-relaxed mb-3" style={{ color: "#AEB9CB" }}>Vehicle claims are usually the single largest deduction for tradies. The ATO wants a continuous 12-week period that records <b className="text-white">every</b> trip — work and private, not just work journeys. Complete your 84-day logbook once — it can support your claims for up to five years while your driving pattern stays similar.</p>
+                      )}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 rounded-xl border" style={{ borderColor: !recommendLogbookMethod && logbookReady ? TEAL : "rgba(255,255,255,0.10)", backgroundColor: !recommendLogbookMethod && logbookReady ? "rgba(37,99,255,0.12)" : "#14233A" }}>
+                          <div className="text-[11px] font-medium" style={{ color: "#79879C" }}>Cents/km method</div>
+                          <div className="text-lg font-bold text-white tabular mt-0.5">{fmt(centsPerKmEstimate)}</div>
+                        </div>
+                        <div className="p-3 rounded-xl border" style={{ borderColor: recommendLogbookMethod ? TEAL : "rgba(255,255,255,0.10)", backgroundColor: recommendLogbookMethod ? "rgba(37,99,255,0.12)" : "#14233A" }}>
+                          <div className="text-[11px] font-medium" style={{ color: "#79879C" }}>Logbook method</div>
+                          <div className="text-lg font-bold text-white tabular mt-0.5">{logbookReady ? fmt(logbookEstimate) : "—"}</div>
+                          <div className="text-[10px] mt-0.5" style={{ color: "#79879C" }}>{logbookReady ? "Business % × total car costs" : "Finish your 12-week logbook to unlock this"}</div>
+                        </div>
+                      </div>
+                      <p className="text-xs leading-relaxed mt-3" style={{ color: "#AEB9CB" }}>
+                        {logbookReady
+                          ? recommendLogbookMethod
+                            ? "Based on what's logged so far, the logbook method looks like the better claim — it's not capped by kilometres like cents/km is."
+                            : "Based on what's logged so far, cents/km looks simpler and about as good — no need to keep tracking every vehicle expense receipt."
+                          : businessKm > CENTS_PER_KM_CAP_KM
+                          ? "You're already over the 5,000 km cap for cents/km — finishing your logbook could unlock a bigger, uncapped claim."
+                          : "Cents/km is fine to use for now. Once your 12-week logbook is done, Glovebox will tell you if switching to the logbook method is worth more."}
+                      </p>
+                    </div>
+
+                    <button onClick={() => csvInputRef.current?.click()} className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold border transition" style={{ borderColor: "rgba(255,255,255,0.14)", color: "#fff" }}>
+                      <Upload size={15} />Import Driversnote CSV
+                    </button>
+
+                    {csvPreview && (
+                      <Card className="p-5">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <div className="text-sm font-semibold" style={{ color: NAVY }}>Driversnote import preview</div>
+                            <div className="text-xs mt-0.5" style={{ color: "#8A93A3" }}>{csvPreview.length} trip{csvPreview.length !== 1 ? "s" : ""} found — review before adding, business/personal may need a manual fix</div>
+                          </div>
+                          <button onClick={() => setCsvPreview(null)} className="p-1.5 rounded-lg text-[#B7BEC9] hover:bg-[#F0F1F4] transition flex-shrink-0"><X size={16} /></button>
+                        </div>
+                        {csvPreview.length === 0 ? (
+                          <p className="text-sm" style={{ color: "#8A93A3" }}>Couldn't find any trips in that file — check it's a CSV export with date, distance and purpose columns.</p>
+                        ) : (
+                          <>
+                            <div className="max-h-56 overflow-y-auto rounded-xl border" style={{ borderColor: GREY_LINE }}>
+                              {csvPreview.slice(0, 50).map((t) => (
+                                <div key={t.id} className="flex items-center gap-3 px-3 py-2 border-b last:border-0 text-xs" style={{ borderColor: GREY_LINE }}>
+                                  <span className="tabular flex-shrink-0" style={{ color: "#8A93A3" }}>{t.date}</span>
+                                  <span className="flex-1 truncate" style={{ color: NAVY }}>{t.purpose}</span>
+                                  <span className="tabular font-medium flex-shrink-0" style={{ color: NAVY }}>{t.km} km</span>
+                                  <Pill tone={t.type === "business" ? "teal" : "grey"}>{t.type}</Pill>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="flex justify-end gap-2 mt-3">
+                              <button onClick={() => setCsvPreview(null)} className="px-4 py-2 rounded-xl text-sm font-medium text-[#5B6472] hover:bg-[#F0F1F4] transition">Cancel</button>
+                              <button onClick={confirmCSVImport} className="px-4 py-2 rounded-xl text-sm font-semibold text-white shadow-sm hover:brightness-110 transition" style={{ backgroundColor: TEAL }}>Add {csvPreview.length} trips</button>
+                            </div>
+                          </>
+                        )}
+                      </Card>
+                    )}
+
+                    <div>
+                      <div className="text-sm font-semibold text-white mb-1">Vehicle Expense Tracker</div>
+                      <div className="text-xs mb-3" style={{ color: "#79879C" }}>Fuel, servicing, rego & insurance — these feed the logbook-method estimate above.</div>
+                      <div className="rounded-2xl p-2 sm:p-4" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                        <div className="px-2">
+                          {receiptsWithNum.filter((r) => r.category === "vehicle").length === 0 ? (
+                            <div className="py-10 text-center">
+                              <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: "rgba(37,99,255,0.15)" }}><Fuel size={20} style={{ color: TEAL }} /></div>
+                              <p className="text-sm font-semibold text-white">No vehicle expenses yet</p>
+                              <p className="text-xs mt-1" style={{ color: "#79879C" }}>Scan a fuel, servicing or insurance receipt and tag it as "Vehicle &amp; Fuel".</p>
+                            </div>
+                          ) : (
+                            receiptsWithNum.filter((r) => r.category === "vehicle").map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} onEdit={setEditingReceipt} />)
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button onClick={() => setTab("settings")} className="w-full flex items-center justify-between px-5 py-4 rounded-2xl border text-left transition" style={{ borderColor: "rgba(255,255,255,0.10)", backgroundColor: "#0D1B2E" }}>
+                      <span className="text-sm font-semibold text-white">Vehicle details</span>
+                      <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: TEAL }}>Edit in Settings<ChevronRight size={14} /></span>
+                    </button>
+                  </>
+                )}
+
+                {logbookSubTab === "review" && (
+                  <>
+                    {!firstTripDate ? (
+                      <div className="rounded-2xl p-6 text-center" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                        <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: "rgba(37,99,255,0.15)" }}><Calendar size={22} style={{ color: TEAL }} /></div>
+                        <div className="text-sm font-semibold text-white">Nothing to review yet</div>
+                        <p className="text-xs mt-2 leading-relaxed" style={{ color: "#AEB9CB" }}>Log your first trip to start your 12-week logbook — Glovebox will flag any days you might have missed after that.</p>
+                        <button onClick={() => openTripFormFor(null)} className="mt-4 px-4 py-2 rounded-xl text-sm font-semibold text-white" style={{ backgroundColor: TEAL }}>Log a trip</button>
+                      </div>
+                    ) : reviewGapDays.length === 0 ? (
+                      <div className="rounded-2xl p-6 text-center" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                        <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: "rgba(24,195,126,0.15)" }}><CheckCircle2 size={22} style={{ color: GREEN }} /></div>
+                        <div className="text-sm font-semibold text-white">All caught up</div>
+                        <p className="text-xs mt-2 leading-relaxed" style={{ color: "#AEB9CB" }}>Every day in the last {REVIEW_WINDOW_DAYS} days has a trip logged, or you've confirmed there wasn't one.</p>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-xs leading-relaxed" style={{ color: "#AEB9CB" }}>These days in your logbook period don't have a trip logged. Log one, or confirm there wasn't any driving that day — the ATO logbook needs a continuous record.</p>
+                        {reviewGapDays.map((iso) => (
+                          <div key={iso} className="rounded-2xl p-4 flex items-center gap-3" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                            <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(199,127,26,0.15)" }}><Calendar size={16} style={{ color: AMBER }} /></div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-medium text-white">{new Date(iso).toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "short" })}</div>
+                              <div className="text-xs mt-0.5" style={{ color: "#79879C" }}>No trip logged</div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <button onClick={() => markNoTravel(iso)} className="px-3 py-1.5 rounded-lg text-xs font-semibold transition" style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "#AEB9CB" }}>No travel</button>
+                              <button onClick={() => openTripFormFor(iso)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition" style={{ backgroundColor: TEAL }}>Log trip</button>
+                            </div>
                           </div>
                         ))}
-                      </div>
-                      <div className="flex justify-end gap-2 mt-3">
-                        <button onClick={() => setCsvPreview(null)} className="px-4 py-2 rounded-xl text-sm font-medium text-[#5B6472] hover:bg-[#F0F1F4] transition">Cancel</button>
-                        <button onClick={confirmCSVImport} className="px-4 py-2 rounded-xl text-sm font-semibold text-white shadow-sm hover:brightness-110 transition" style={{ backgroundColor: TEAL }}>Add {csvPreview.length} trips</button>
-                      </div>
-                    </>
-                  )}
-                </Card>
-              )}
-
-              <Card className="p-2 sm:p-4">
-                <div className="px-2 pt-2 pb-1 text-xs font-semibold" style={{ color: NAVY_SOFT }}>Trip log</div>
-                <div className="px-2">
-                  {trips.length === 0 ? (
-                    <EmptyState icon={Car} title="No trips logged yet" subtitle="Tap Log Trip above, or import a Driversnote CSV to backfill your history." />
-                  ) : (
-                    trips.map((t) => (
-                      <div key={t.id} className="flex items-center gap-3 py-3 border-b last:border-0" style={{ borderColor: GREY_LINE }}>
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: t.type === "business" ? TEAL_TINT : "#F0F1F4" }}><Car size={15} color={t.type === "business" ? TEAL_DARK : "#8A93A3"} /></div>
-                        <div className="min-w-0 flex-1"><div className="text-sm font-medium truncate" style={{ color: NAVY }}>{t.purpose || (t.type === "business" ? "Work trip" : "Personal trip")}</div><div className="text-xs text-[#8A93A3]">{new Date(t.date).toLocaleDateString("en-AU", { day: "2-digit", month: "short" })}</div></div>
-                        <div className="text-sm font-semibold tabular" style={{ color: NAVY }}>{t.km} km</div>
-                        <Pill tone={t.type === "business" ? "teal" : "grey"}>{t.type === "business" ? "Business" : "Personal"}</Pill>
-                        <button onClick={() => deleteTrip(t.id)} className="p-1.5 rounded-lg text-[#B7BEC9] hover:text-[#C4573F] hover:bg-[#FBEAE6] transition"><Trash2 size={15} /></button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </Card>
-
-              <SectionTitle title="Vehicle Expense Tracker" eyebrow="Fuel, servicing, rego & insurance" sub="These feed the logbook-method estimate above." />
-              <Card className="p-2 sm:p-4">
-                <div className="px-2">
-                  {receiptsWithNum.filter((r) => r.category === "vehicle").length === 0 ? (
-                    <EmptyState icon={Fuel} title="No vehicle expenses yet" subtitle={'Scan a fuel, servicing or insurance receipt and tag it as "Vehicle & Fuel".'} />
-                  ) : (
-                    receiptsWithNum.filter((r) => r.category === "vehicle").map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} onEdit={setEditingReceipt} />)
-                  )}
-                </div>
-              </Card>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
+            {logbookSubTab === "overview" && (
+              <button onClick={() => openTripFormFor(null)} className="fixed right-4 sm:right-6 bottom-20 lg:bottom-6 z-20 w-14 h-14 rounded-full flex items-center justify-center transition hover:brightness-110 active:scale-95" style={{ backgroundColor: TEAL, boxShadow: "0 8px 24px -4px rgba(37,99,255,0.55)" }} aria-label="Add Trip">
+                <Plus size={24} color="#fff" />
+              </button>
+            )}
+            </>
           )}
 
           {tab === "expenses" && (
@@ -2440,18 +2667,20 @@ export default function App() {
       )}
 
       {showTripForm && (
-        <LogTripScreen onSaveTrips={addTrips} onClose={() => setShowTripForm(false)} homeAddress={activeData.profile.homeAddress} assumeRoundTrip={activeData.profile.assumeRoundTrip} />
+        <LogTripScreen onSaveTrips={addTrips} onClose={() => { setShowTripForm(false); setTripFormDate(null); }} homeAddress={activeData.profile.homeAddress} assumeRoundTrip={activeData.profile.assumeRoundTrip} initialDate={tripFormDate || undefined} />
       )}
 
       {!showReceiptForm && !showTripForm && !editingReceipt && !assistantOpen && (
         <>
-          <FloatingActionButton
-            onScan={quickUploadReceipt}
-            onLogTrip={quickLogTravel}
-            onAddExpense={openManualExpenseEntry}
-            onImportCsv={() => csvInputRef.current?.click()}
-           
-          />
+          {!(tab === "vehicle" && logbookSubTab === "overview") && (
+            <FloatingActionButton
+              onScan={quickUploadReceipt}
+              onLogTrip={quickLogTravel}
+              onAddExpense={openManualExpenseEntry}
+              onImportCsv={() => csvInputRef.current?.click()}
+
+            />
+          )}
           {ASSISTANT_URL && <AssistantButton onClick={() => setAssistantOpen(true)} />}
         </>
       )}
