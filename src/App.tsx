@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   LayoutDashboard, Receipt, Car, Wrench, Shirt, HardHat, Smartphone,
-  GraduationCap, FileText, Plus, Trash2, ChevronRight, Menu,
+  GraduationCap, FileText, Plus, Trash2, ChevronRight, ChevronLeft, Menu,
   Download, Printer, TrendingUp, MapPin, Sparkles, Camera,
   Check, CheckCircle2, AlertTriangle, Fuel, Upload, ShieldCheck, X,
   Search, SlidersHorizontal, Send, Mic, LogOut, Landmark,
   Info, Wallet, Bell, MoreHorizontal, WashingMachine, Settings as SettingsIcon,
+  Zap, Image as ImageIcon, RefreshCw,
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import type { AppData, Receipt as ReceiptT, Trip, CategoryKey, Profile } from "./types";
@@ -251,7 +252,9 @@ function RadialProgress({
   );
 }
 
-function ReceiptForm({ onSave, onCancel, categoryLock, initial }: { onSave: (r: ReceiptT) => void; onCancel: () => void; categoryLock?: CategoryKey; initial?: ReceiptT }) {
+const darkInputCls = "w-full rounded-xl border px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal focus:border-transparent transition disabled:opacity-50 disabled:cursor-not-allowed";
+
+function ReceiptForm({ onSave, onCancel, categoryLock, initial, dark }: { onSave: (r: ReceiptT) => void; onCancel: () => void; categoryLock?: CategoryKey; initial?: ReceiptT; dark?: boolean }) {
   const [r, setR] = useState<{ id: string; date: string; vendor: string; category: CategoryKey; amount: string; workPct: string; filed: boolean; notes: string }>(
     initial
       ? { id: initial.id, date: initial.date, vendor: initial.vendor, category: initial.category, amount: initial.amount ? String(initial.amount) : "", workPct: String(initial.workPct), filed: initial.filed, notes: initial.notes || "" }
@@ -259,28 +262,37 @@ function ReceiptForm({ onSave, onCancel, categoryLock, initial }: { onSave: (r: 
   );
   useEffect(() => { if (categoryLock) setR((p) => ({ ...p, category: categoryLock })); }, [categoryLock]);
   const set = <K extends keyof typeof r>(k: K, v: (typeof r)[K]) => setR((p) => ({ ...p, [k]: v }));
+  const fieldCls = dark ? darkInputCls : inputCls;
+  const fieldStyle = dark ? { backgroundColor: "#0D1B2E", borderColor: "rgba(255,255,255,0.14)" } : undefined;
+  const DarkField = ({ label, children }: { label: string; children: React.ReactNode }) => (
+    <label className="block">
+      <span className="block text-xs font-medium mb-1.5" style={{ color: "#B7C5D8" }}>{label}</span>
+      {children}
+    </label>
+  );
+  const F = dark ? DarkField : Field;
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 rounded-2xl border" style={{ borderColor: GREY_LINE, backgroundColor: "#FBFBFC" }}>
-      <Field label="Date"><input type="date" value={r.date} onChange={(e) => set("date", e.target.value)} className={inputCls} /></Field>
-      <Field label="Vendor"><input value={r.vendor} onChange={(e) => set("vendor", e.target.value)} placeholder="e.g. Total Tools" className={inputCls} /></Field>
-      <Field label="Category">
-        <select disabled={!!categoryLock} value={r.category} onChange={(e) => set("category", e.target.value as CategoryKey)} className={inputCls}>
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 rounded-2xl border" style={dark ? { borderColor: "rgba(255,255,255,0.10)", backgroundColor: "#14233A" } : { borderColor: GREY_LINE, backgroundColor: "#FBFBFC" }}>
+      <F label="Date"><input type="date" value={r.date} onChange={(e) => set("date", e.target.value)} className={fieldCls} style={fieldStyle} /></F>
+      <F label="Vendor"><input value={r.vendor} onChange={(e) => set("vendor", e.target.value)} placeholder="e.g. Total Tools" className={fieldCls} style={fieldStyle} /></F>
+      <F label="Category">
+        <select disabled={!!categoryLock} value={r.category} onChange={(e) => set("category", e.target.value as CategoryKey)} className={fieldCls} style={fieldStyle}>
           {CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
         </select>
-      </Field>
-      <Field label="Amount (incl. GST)"><input type="number" step="0.01" value={r.amount} onChange={(e) => set("amount", e.target.value)} placeholder="0.00" className={inputCls} /></Field>
-      <Field label="Work-related %"><input type="number" min={0} max={100} value={r.workPct} onChange={(e) => set("workPct", e.target.value)} className={inputCls} /></Field>
-      <Field label="Filed / saved?">
-        <select value={r.filed ? "yes" : "no"} onChange={(e) => set("filed", e.target.value === "yes")} className={inputCls}>
+      </F>
+      <F label="Amount (incl. GST)"><input type="number" step="0.01" value={r.amount} onChange={(e) => set("amount", e.target.value)} placeholder="0.00" className={fieldCls} style={fieldStyle} /></F>
+      <F label="Work-related %"><input type="number" min={0} max={100} value={r.workPct} onChange={(e) => set("workPct", e.target.value)} className={fieldCls} style={fieldStyle} /></F>
+      <F label="Filed / saved?">
+        <select value={r.filed ? "yes" : "no"} onChange={(e) => set("filed", e.target.value === "yes")} className={fieldCls} style={fieldStyle}>
           <option value="yes">Yes</option>
           <option value="no">Not yet</option>
         </select>
-      </Field>
+      </F>
       <div className="col-span-2 sm:col-span-3">
-        <Field label="Notes (optional)"><input value={r.notes} onChange={(e) => set("notes", e.target.value)} placeholder="What was it for?" className={inputCls} /></Field>
+        <F label="Notes (optional)"><input value={r.notes} onChange={(e) => set("notes", e.target.value)} placeholder="What was it for?" className={fieldCls} style={fieldStyle} /></F>
       </div>
       <div className="col-span-2 sm:col-span-3 flex justify-end gap-2 pt-1">
-        <button onClick={onCancel} className="px-4 py-2 rounded-xl text-sm font-medium text-[#5B6472] hover:bg-[#F0F1F4] transition">Cancel</button>
+        <button onClick={onCancel} className={`px-4 py-2 rounded-xl text-sm font-medium transition ${dark ? "text-white/70 hover:bg-white/10" : "text-[#5B6472] hover:bg-[#F0F1F4]"}`}>Cancel</button>
         <button
           onClick={() => {
             if (!r.vendor || !r.amount) return;
@@ -298,6 +310,30 @@ function ReceiptForm({ onSave, onCancel, categoryLock, initial }: { onSave: (r: 
 
 function ReceiptReviewModal({ item, onSave, onCancel }: { item: ScanQueueItem; onSave: (r: ReceiptT) => void; onCancel: () => void }) {
   const result = item.result;
+  const [showForm, setShowForm] = useState(!item.scanning);
+  const [caption, setCaption] = useState("Reading receipt…");
+
+  useEffect(() => {
+    if (!item.scanning) return;
+    const captions = ["Reading receipt…", "Categorising…"];
+    let i = 0;
+    setCaption(captions[0]);
+    const t = window.setInterval(() => { i = (i + 1) % captions.length; setCaption(captions[i]); }, 900);
+    return () => window.clearInterval(t);
+  }, [item.scanning]);
+
+  useEffect(() => {
+    if (item.scanning) return;
+    if (result) {
+      const label = CATEGORIES.find((c) => c.key === result.category)?.label || "Receipt";
+      setCaption(`${label} receipt detected`);
+    } else if (item.failed) {
+      setCaption("Couldn't read receipt");
+    }
+    const t = window.setTimeout(() => setShowForm(true), 650);
+    return () => window.clearTimeout(t);
+  }, [item.scanning, result, item.failed]);
+
   const initial: ReceiptT = {
     id: item.id,
     date: result?.date || todayISO(),
@@ -311,38 +347,89 @@ function ReceiptReviewModal({ item, onSave, onCancel }: { item: ScanQueueItem; o
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold" style={{ color: NAVY }}>Review receipt</span>
-        <button onClick={onCancel} className="p-1.5 rounded-lg text-[#B7BEC9] hover:bg-[#F0F1F4] transition"><X size={16} /></button>
+        <span className="text-sm font-semibold text-white">Receipt Details</span>
+        <button onClick={onCancel} className="p-1.5 rounded-lg text-white/60 hover:bg-white/10 transition"><X size={16} /></button>
       </div>
       {item.thumb && <img src={item.thumb} alt="" className="w-full max-h-52 object-cover rounded-2xl" />}
-      {item.scanning ? (
-        <div className="flex flex-col items-center gap-3 py-8">
+      {!showForm ? (
+        <div className="flex flex-col items-center gap-3 py-10">
           <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: TEAL, borderTopColor: "transparent" }} />
-          <span className="text-sm font-medium" style={{ color: NAVY }}>Reading your receipt…</span>
+          <span className="text-sm font-medium text-white">{caption}</span>
         </div>
       ) : (
         <>
           {result && (
-            <Card className="p-4 flex items-start gap-3">
-              <Sparkles size={16} color={TEAL_DARK} className="flex-shrink-0 mt-0.5" />
+            <div className="p-4 rounded-2xl flex items-start gap-3" style={{ backgroundColor: "#14233A", border: "1px solid rgba(255,255,255,0.10)" }}>
+              <Sparkles size={16} color={TEAL} className="flex-shrink-0 mt-0.5" />
               <div>
-                <div className="text-sm font-semibold" style={{ color: NAVY }}>AI Detected</div>
-                <div className="text-xs mt-0.5 mb-2" style={{ color: "#8A93A3" }}>We've read your receipt — check the details below before saving.</div>
-                <Pill tone={result.confidence === "low" ? "amber" : "teal"}>
+                <div className="text-sm font-semibold text-white">AI Detected</div>
+                <div className="text-xs mt-0.5 mb-2" style={{ color: "#B7C5D8" }}>We've read your receipt — check the details below before saving.</div>
+                <span
+                  className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
+                  style={result.confidence === "low" ? { backgroundColor: AMBER_TINT, color: "#8A5A0F" } : { backgroundColor: GREEN_TINT, color: GREEN_DARK }}
+                >
                   {result.confidence === "low" ? "Low confidence — please check" : result.confidence === "medium" ? "Medium confidence" : "High confidence"}
-                </Pill>
+                </span>
               </div>
-            </Card>
+            </div>
           )}
           {item.failed && (
-            <Card className="p-4 flex items-center gap-2.5" style={{ backgroundColor: AMBER_TINT }}>
+            <div className="p-4 rounded-2xl flex items-center gap-2.5" style={{ backgroundColor: "rgba(199,127,26,0.15)" }}>
               <AlertTriangle size={16} color={AMBER} className="flex-shrink-0" />
-              <span className="text-sm" style={{ color: "#8A5A0F" }}>Couldn't read this one automatically — fill in the details manually.</span>
-            </Card>
+              <span className="text-sm" style={{ color: "#F0C896" }}>Couldn't read this one automatically — fill in the details manually.</span>
+            </div>
           )}
-          <ReceiptForm initial={initial} onSave={onSave} onCancel={onCancel} />
+          <ReceiptForm dark initial={initial} onSave={onSave} onCancel={onCancel} />
         </>
       )}
+    </div>
+  );
+}
+
+function CornerGuide({ corner }: { corner: "tl" | "tr" | "bl" | "br" }) {
+  const pos: Record<string, string> = {
+    tl: "top-4 left-4 border-t-[3px] border-l-[3px] rounded-tl-lg",
+    tr: "top-4 right-4 border-t-[3px] border-r-[3px] rounded-tr-lg",
+    bl: "bottom-4 left-4 border-b-[3px] border-l-[3px] rounded-bl-lg",
+    br: "bottom-4 right-4 border-b-[3px] border-r-[3px] rounded-br-lg",
+  };
+  return <div className={`absolute w-8 h-8 ${pos[corner]}`} style={{ borderColor: TEAL }} />;
+}
+
+function ScanCaptureScreen({ onClose, onGallery, onShutter }: { onClose: () => void; onGallery: () => void; onShutter: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: "#081425" }}>
+      <div className="flex items-center justify-between px-4" style={{ paddingTop: "max(16px, env(safe-area-inset-top))" }}>
+        <button onClick={onClose} className="p-2 -ml-2 text-white" aria-label="Back"><ChevronLeft size={24} /></button>
+        <span className="text-lg font-bold text-white">Scan Receipt</span>
+        <div className="p-2 text-white" aria-hidden="true"><Zap size={20} /></div>
+      </div>
+      <p className="text-center text-sm mt-1" style={{ color: "#B7C5D8" }}>Snap a clear photo of your receipt</p>
+
+      <div className="flex-1 flex items-center justify-center px-6 mt-4 min-h-0">
+        <div className="relative w-full max-w-sm aspect-[3/4] rounded-2xl overflow-hidden" style={{ backgroundColor: "#0D1B2E" }}>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Receipt size={48} style={{ color: "rgba(255,255,255,0.15)" }} />
+          </div>
+          <CornerGuide corner="tl" /><CornerGuide corner="tr" /><CornerGuide corner="bl" /><CornerGuide corner="br" />
+        </div>
+      </div>
+
+      <p className="text-center text-xs mt-4 px-6" style={{ color: "#B7C5D8" }}>
+        <span style={{ color: TEAL, fontWeight: 600 }}>Tips:</span> Good lighting &middot; Flat surface &middot; All edges visible
+      </p>
+
+      <div className="flex items-center justify-between px-10" style={{ paddingTop: "24px", paddingBottom: "max(32px, env(safe-area-inset-bottom))" }}>
+        <button onClick={onGallery} className="flex flex-col items-center gap-1.5 text-white min-w-[44px] min-h-[44px] justify-center">
+          <ImageIcon size={22} />
+          <span className="text-xs font-medium">Gallery</span>
+        </button>
+        <button onClick={onShutter} aria-label="Take photo" className="w-16 h-16 rounded-full bg-white flex-shrink-0 transition active:scale-95" style={{ border: "4px solid rgba(255,255,255,0.3)" }} />
+        <div className="flex flex-col items-center gap-1.5 min-w-[44px] min-h-[44px] justify-center" style={{ color: "#B7C5D8" }}>
+          <RefreshCw size={22} />
+          <span className="text-xs font-medium">Auto</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -902,8 +989,10 @@ export default function App() {
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
   const [assistantLoading, setAssistantLoading] = useState(false);
+  const [showScanCapture, setShowScanCapture] = useState(false);
   const csvInputRef = useRef<HTMLInputElement>(null);
   const receiptInputRef = useRef<HTMLInputElement>(null);
+  const receiptCameraInputRef = useRef<HTMLInputElement>(null);
   const receiptsListRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<number | null>(null);
 
@@ -1028,7 +1117,7 @@ export default function App() {
   const quickUploadReceipt = () => {
     setReceiptCategoryFilter("all");
     setTab("progress");
-    receiptInputRef.current?.click();
+    setShowScanCapture(true);
   };
 
   const quickLogTravel = () => {
@@ -1370,7 +1459,8 @@ export default function App() {
   return (
     <div className="min-h-screen w-full font-sans" style={{ backgroundColor: GREY_BG }}>
       <input ref={csvInputRef} type="file" accept=".csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleCSVFile(f); e.target.value = ""; }} />
-      <input ref={receiptInputRef} type="file" multiple accept="image/*,.pdf" className="hidden" onChange={(e) => { if (e.target.files?.length) handleFiles(Array.from(e.target.files)); e.target.value = ""; }} />
+      <input ref={receiptInputRef} type="file" multiple accept="image/*,.pdf" className="hidden" onChange={(e) => { if (e.target.files?.length) handleFiles(Array.from(e.target.files)); setShowScanCapture(false); e.target.value = ""; }} />
+      <input ref={receiptCameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { if (e.target.files?.length) handleFiles(Array.from(e.target.files)); setShowScanCapture(false); e.target.value = ""; }} />
 
       <div className="flex">
         <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 h-screen sticky top-0 border-r px-4 py-6 print:hidden" style={{ borderColor: GREY_LINE, backgroundColor: "#FFFFFF" }}>
@@ -2060,10 +2150,19 @@ export default function App() {
         </div>
       )}
 
+      {showScanCapture && (
+        <ScanCaptureScreen
+          onClose={() => setShowScanCapture(false)}
+          onGallery={() => receiptInputRef.current?.click()}
+          onShutter={() => receiptCameraInputRef.current?.click()}
+        />
+      )}
+
       {scanQueue.length > 0 && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
-          <div className="w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl p-5 max-h-[92vh] overflow-y-auto">
+          <div className="w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl p-5 max-h-[92vh] overflow-y-auto" style={{ backgroundColor: "#0D1B2E" }}>
             <ReceiptReviewModal
+              key={scanQueue[0].id}
               item={scanQueue[0]}
               onSave={(r) => { addReceipt(r); setScanQueue((p) => p.slice(1)); }}
               onCancel={() => setScanQueue((p) => p.slice(1))}
