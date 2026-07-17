@@ -1810,7 +1810,7 @@ export default function App() {
           </div>
         </aside>
 
-        {tab !== "overview" && tab !== "vehicle" && tab !== "expenses" && (
+        {tab !== "overview" && tab !== "vehicle" && tab !== "expenses" && tab !== "benefits" && (
           <div className="lg:hidden fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 border-b print:hidden" style={{ backgroundColor: "#FFFFFFF2", borderColor: GREY_LINE, backdropFilter: "blur(8px)" }}>
             <div className="flex items-center gap-2">
               <img src={gloveboxLogo} alt="Glovebox" className="h-9 w-auto" />
@@ -2602,7 +2602,22 @@ export default function App() {
             </div>
           )}
 
-          {tab === "benefits" && <BenefitsFeature />}
+          {tab === "benefits" && (
+            <div className="-mx-4 sm:-mx-6 lg:mx-0 -mt-[68px] lg:mt-0 min-h-screen lg:min-h-0 lg:rounded-3xl fade-up" style={{ backgroundColor: "#081425" }}>
+              <div className="px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-28 lg:pb-10">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}>
+                    <Zap size={18} color="#fff" fill="#fff" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xl font-bold text-white">Benefits</div>
+                    <div className="text-xs mt-0.5 truncate" style={{ color: "#79879C" }}>Payments, support and concessions you may be missing.</div>
+                  </div>
+                </div>
+                <BenefitsFeature />
+              </div>
+            </div>
+          )}
 
           {tab === "settings" && (
             <div className="space-y-6">
