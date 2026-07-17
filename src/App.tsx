@@ -820,10 +820,39 @@ function Disclosure({ title, defaultOpen = false, children }: { title: string; d
 }
 
 
-function QuickSetupCard({ occupation, income, onSave, disabled }: { occupation: string; income: number; onSave: (occupation: string, income: number) => void; disabled?: boolean }) {
+function QuickSetupCard({ occupation, income, onSave, disabled, dark }: { occupation: string; income: number; onSave: (occupation: string, income: number) => void; disabled?: boolean; dark?: boolean }) {
   const [draftOccupation, setDraftOccupation] = useState(occupation);
   const [draftIncome, setDraftIncome] = useState(income ? String(income) : "");
   const canSave = draftOccupation.trim() !== "" && (parseFloat(draftIncome) || 0) > 0;
+
+  if (dark) {
+    return (
+      <div className="rounded-2xl p-5" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+        <div className="text-[11px] font-semibold tracking-wide uppercase mb-1" style={{ color: TEAL }}>Quick setup</div>
+        <h2 className="text-lg font-semibold text-white">Tell Glovebox about your work</h2>
+        <p className="text-xs mt-1 max-w-md" style={{ color: "#79879C" }}>Just enough to start estimating your refund — you can refine the details later.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+          <DarkField label="Job description">
+            <input disabled={disabled} value={draftOccupation} onChange={(e) => setDraftOccupation(e.target.value)} placeholder="e.g. Apprentice Electrician" className={darkInputCls} style={darkFieldBg} />
+          </DarkField>
+          <DarkField label="Expected income this year ($)">
+            <input disabled={disabled} type="number" value={draftIncome} onChange={(e) => setDraftIncome(e.target.value)} placeholder="e.g. 52000" className={darkInputCls} style={darkFieldBg} />
+          </DarkField>
+        </div>
+        <div className="flex justify-end mt-3">
+          <button
+            onClick={() => onSave(draftOccupation, parseFloat(draftIncome) || 0)}
+            disabled={disabled || !canSave}
+            className="px-4 py-2 rounded-xl text-sm font-semibold text-white hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ backgroundColor: TEAL }}
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Card className="p-5">
       <SectionTitle eyebrow="Quick setup" title="Tell Glovebox about your work" sub="Just enough to start estimating your refund — you can refine the details later." />
@@ -1811,18 +1840,20 @@ export default function App() {
         <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-10 py-6 lg:py-8 pt-[68px] lg:pt-8 pb-36 lg:pb-24 max-w-6xl mx-auto w-full">
 
           {tab === "overview" && (
-            <div className="space-y-6">
-              <div className="rounded-b-3xl lg:rounded-3xl -mx-4 sm:-mx-6 lg:mx-0 -mt-[68px] lg:mt-0 px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-6 fade-up" style={{ backgroundColor: NAVY }}>
-                <div className="lg:hidden flex items-center justify-between mb-5">
+            <div className="-mx-4 sm:-mx-6 lg:mx-0 -mt-[68px] lg:mt-0 min-h-screen lg:min-h-0 lg:rounded-3xl fade-up" style={{ backgroundColor: "#081425" }}>
+              <div className="px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-28 lg:pb-10 space-y-4">
+                <div className="lg:hidden flex items-center justify-between">
                   <img src={gloveboxLogo} alt="Glovebox" className="h-9 w-auto" />
                   <div className="relative p-2" aria-hidden="true">
                     <Bell size={20} color="#fff" />
                     <span className="absolute top-2 right-2 w-2 h-2 rounded-full" style={{ backgroundColor: "#D64545" }} />
                   </div>
                 </div>
-                <h1 className="text-2xl font-bold text-white">{greeting}{activeData.profile.name ? `, ${activeData.profile.name}` : ""} 👋</h1>
-                <p className="text-sm mt-1 text-white/70">{estimatedRefund > 0 ? "You're on track to save" : `${activeData.profile.occupation} · ${activeData.profile.fy}`}</p>
-                <div className="grid grid-cols-3 gap-3 mt-5">
+                <div>
+                  <h1 className="text-2xl font-bold text-white">{greeting}{activeData.profile.name ? `, ${activeData.profile.name}` : ""} 👋</h1>
+                  <p className="text-sm mt-1" style={{ color: "#AEB9CB" }}>{estimatedRefund > 0 ? "You're on track to save" : `${activeData.profile.occupation} · ${activeData.profile.fy}`}</p>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
                   <button
                     onClick={quickUploadReceipt}
                     className="flex flex-col items-start justify-center gap-2 rounded-[18px] px-3 py-3.5 text-left transition active:scale-[0.98]"
@@ -1858,94 +1889,97 @@ export default function App() {
                     </div>
                   </button>
                 </div>
-              </div>
 
-              {!activeData.profile.quickSetupDone ? (
-                <QuickSetupCard
-                  occupation={activeData.profile.occupation}
-                  income={activeData.profile.income}
-                  onSave={saveQuickSetup}
-                />
-              ) : (
-                <Card className="p-6">
-                  <div className="flex items-start justify-between gap-3">
+                {!activeData.profile.quickSetupDone ? (
+                  <QuickSetupCard
+                    occupation={activeData.profile.occupation}
+                    income={activeData.profile.income}
+                    onSave={saveQuickSetup}
+                    dark
+                  />
+                ) : (
+                  <div className="rounded-2xl p-5" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: "#79879C" }}>
+                          Estimated Tax Position <Info size={12} />
+                        </div>
+                        <div className="text-xs mt-2" style={{ color: "#79879C" }}>Estimated refund</div>
+                        <div className="text-4xl font-bold tabular mt-0.5 text-white"><AnimatedNumber value={Math.max(0, estimatedRefund)} /></div>
+                        {weeklyDelta > 0 && (
+                          <div className="inline-flex items-center gap-1 mt-3 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: "rgba(24,195,126,0.15)", color: GREEN }}>
+                            <TrendingUp size={12} /> {fmt(weeklyDelta)} this month
+                          </div>
+                        )}
+                      </div>
+                      <div className="pt-2 pb-3">
+                        <RadialProgress pct={readyPct} label="Tax Ready" trackColor="rgba(255,255,255,0.12)" progressColor={TEAL} textColor="#fff" labelColor="#AEB9CB" />
+                      </div>
+                    </div>
+                    <div className="mt-3 -mx-1">
+                      <TrendSparkline points={weeklyDeductionsTrend} color={TEAL} />
+                    </div>
+                    <div className="mt-5 pt-4 grid grid-cols-4 gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                      {[
+                        { icon: Wallet, label: "Income", value: fmt(income) },
+                        { icon: Landmark, label: "Tax withheld", value: fmt(withheld) },
+                        { icon: Wallet, label: "Current deductions", value: fmt(totalDeductions) },
+                        { icon: Car, label: "Vehicle method", value: "Logbook" },
+                      ].map((s) => (
+                        <div key={s.label} className="flex flex-col items-center text-center gap-1.5">
+                          <s.icon size={15} style={{ color: TEAL }} />
+                          <div className="text-[10px] leading-tight" style={{ color: "#79879C" }}>{s.label}</div>
+                          <div className="text-xs font-semibold tabular text-white">{s.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {todaysTasks.length > 0 && (
+                  <div className="rounded-2xl p-5" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-semibold text-white">Today's Tasks</span>
+                      <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ backgroundColor: "rgba(37,99,255,0.15)", color: TEAL }}>{todaysTasks.length}</span>
+                    </div>
+                    <div>
+                      {todaysTasks.map((t) => (
+                        <button key={t.key} onClick={t.onGo} className="w-full flex items-center gap-3 py-3 text-left border-t first:border-t-0 disabled:opacity-50 disabled:cursor-not-allowed group" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+                          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(37,99,255,0.15)" }}>
+                            <t.icon size={16} style={{ color: TEAL }} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-semibold text-white">{t.title}</div>
+                            <div className="text-xs mt-0.5 truncate" style={{ color: "#79879C" }}>{t.detail}</div>
+                          </div>
+                          <ChevronRight size={16} className="flex-shrink-0" style={{ color: "#3A4A66" }} />
+                        </button>
+                      ))}
+                    </div>
+                    {laundryTaxBenefit > 0 && (
+                      <div className="flex items-center justify-between pt-3 mt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                        <span className="text-xs font-semibold" style={{ color: "#AEB9CB" }}>Estimated tax benefit today</span>
+                        <span className="text-sm font-bold tabular" style={{ color: GREEN }}>+{fmt(laundryTaxBenefit)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {todaySuggestion && (
+                  <div className="rounded-2xl p-4 flex items-center gap-3" style={{ backgroundColor: "#14233A", border: "1px solid rgba(255,255,255,0.10)" }}>
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(37,99,255,0.15)" }}>
+                      <Sparkles size={16} style={{ color: TEAL }} />
+                    </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: "#8A93A3" }}>
-                        Estimated Tax Position <Info size={12} />
-                      </div>
-                      <div className="text-xs mt-2" style={{ color: "#8A93A3" }}>Estimated refund</div>
-                      <div className="text-4xl font-bold tabular mt-0.5" style={{ color: NAVY }}><AnimatedNumber value={Math.max(0, estimatedRefund)} /></div>
-                      {weeklyDelta > 0 && (
-                        <div className="inline-flex items-center gap-1 mt-3 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: GREEN_TINT, color: GREEN_DARK }}>
-                          <TrendingUp size={12} /> {fmt(weeklyDelta)} this month
-                        </div>
-                      )}
+                      <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEAL }}>Glovebox Insight</div>
+                      <div className="text-sm font-medium mt-0.5 text-white">{todaySuggestion.text}</div>
                     </div>
-                    <div className="pt-2 pb-3">
-                      <RadialProgress pct={readyPct} label="Tax Ready" trackColor={GREY_LINE} progressColor={TEAL} textColor={NAVY} labelColor="#8A93A3" />
-                    </div>
+                    <button onClick={todaySuggestion.action} className="px-3.5 py-1.5 rounded-full text-xs font-semibold flex-shrink-0 disabled:opacity-50 transition hover:brightness-110" style={{ backgroundColor: TEAL, color: "#fff" }}>
+                      Add now
+                    </button>
                   </div>
-                  <div className="mt-3 -mx-1">
-                    <TrendSparkline points={weeklyDeductionsTrend} color={TEAL} />
-                  </div>
-                  <div className="mt-5 pt-4 grid grid-cols-4 gap-2" style={{ borderTop: "1px solid " + GREY_LINE }}>
-                    {[
-                      { icon: Wallet, label: "Income", value: fmt(income) },
-                      { icon: Landmark, label: "Tax withheld", value: fmt(withheld) },
-                      { icon: Wallet, label: "Current deductions", value: fmt(totalDeductions) },
-                      { icon: Car, label: "Vehicle method", value: "Logbook" },
-                    ].map((s) => (
-                      <div key={s.label} className="flex flex-col items-center text-center gap-1.5">
-                        <s.icon size={15} style={{ color: TEAL_DARK }} />
-                        <div className="text-[10px] leading-tight" style={{ color: "#8A93A3" }}>{s.label}</div>
-                        <div className="text-xs font-semibold tabular" style={{ color: NAVY }}>{s.value}</div>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
-
-              {todaysTasks.length > 0 && (
-                <Card className="p-5">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-semibold" style={{ color: NAVY }}>Today's Tasks</span>
-                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ backgroundColor: TEAL_TINT, color: TEAL_DARK }}>{todaysTasks.length}</span>
-                  </div>
-                  <div className="divide-y" style={{ borderColor: GREY_LINE }}>
-                    {todaysTasks.map((t) => (
-                      <button key={t.key} onClick={t.onGo} className="w-full flex items-center gap-3 py-3 text-left disabled:opacity-50 disabled:cursor-not-allowed group">
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL_TINT }}>
-                          <t.icon size={16} color={TEAL_DARK} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold" style={{ color: NAVY }}>{t.title}</div>
-                          <div className="text-xs mt-0.5 truncate" style={{ color: "#8A93A3" }}>{t.detail}</div>
-                        </div>
-                        <ChevronRight size={16} className="flex-shrink-0" style={{ color: "#B7BEC9" }} />
-                      </button>
-                    ))}
-                  </div>
-                  {laundryTaxBenefit > 0 && (
-                    <div className="flex items-center justify-between pt-3 mt-1" style={{ borderTop: "1px solid " + GREY_LINE }}>
-                      <span className="text-xs font-semibold" style={{ color: NAVY_SOFT }}>Estimated tax benefit today</span>
-                      <span className="text-sm font-bold tabular" style={{ color: GREEN_DARK }}>+{fmt(laundryTaxBenefit)}</span>
-                    </div>
-                  )}
-                </Card>
-              )}
-
-              {todaySuggestion && (
-                <Card className="p-4 flex items-center gap-3" style={{ backgroundColor: TEAL_TINT }}>
-                  <Sparkles size={16} color={TEAL_DARK} className="flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEAL_DARK }}>Glovebox Insight</div>
-                    <div className="text-sm font-medium mt-0.5" style={{ color: NAVY }}>{todaySuggestion.text}</div>
-                  </div>
-                  <button onClick={todaySuggestion.action} className="px-3.5 py-1.5 rounded-full text-xs font-semibold flex-shrink-0 disabled:opacity-50 transition hover:brightness-95 bg-white" style={{ color: TEAL_DARK }}>
-                    Add now
-                  </button>
-                </Card>
-              )}
+                )}
+              </div>
             </div>
           )}
 
