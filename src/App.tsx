@@ -1154,7 +1154,7 @@ function ReadinessItem({ ok, title, detail, cta, onGo }: { ok: boolean; title: s
 function AuthLogo() {
   return (
     <div className="flex justify-center mb-8">
-      <img src={gloveboxLogo} alt="Glovebox" className="h-20 w-auto" />
+      <img src={gloveboxLogo} alt="Glovebox" className="h-24 w-auto" />
     </div>
   );
 }
@@ -1790,7 +1790,7 @@ export default function App() {
       <div className="flex">
         <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 h-screen sticky top-0 border-r px-4 py-6 print:hidden" style={{ borderColor: GREY_LINE, backgroundColor: "#FFFFFF" }}>
           <div className="flex items-center gap-2 px-2 mb-8">
-            <img src={gloveboxLogo} alt="Glovebox" className="h-10 w-auto" />
+            <img src={gloveboxLogo} alt="Glovebox" className="h-12 w-auto" />
             <div className="text-[11px] text-[#8A93A3] leading-tight">{activeData.profile.fy}</div>
           </div>
           <nav className="flex flex-col gap-1">
@@ -1813,7 +1813,7 @@ export default function App() {
         {tab !== "overview" && tab !== "vehicle" && tab !== "expenses" && tab !== "benefits" && (
           <div className="lg:hidden fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 border-b print:hidden" style={{ backgroundColor: "#FFFFFFF2", borderColor: GREY_LINE, backdropFilter: "blur(8px)" }}>
             <div className="flex items-center gap-2">
-              <img src={gloveboxLogo} alt="Glovebox" className="h-9 w-auto" />
+              <img src={gloveboxLogo} alt="Glovebox" className="h-11 w-auto" />
             </div>
             <div className="relative p-2" aria-hidden="true"><Bell size={19} color={NAVY} /><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ backgroundColor: "#D64545" }} /></div>
           </div>
@@ -1843,7 +1843,7 @@ export default function App() {
             <div className="-mx-4 sm:-mx-6 lg:mx-0 -mt-[68px] lg:mt-0 min-h-screen lg:min-h-0 lg:rounded-3xl fade-up" style={{ backgroundColor: "#081425" }}>
               <div className="px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-28 lg:pb-10 space-y-4">
                 <div className="lg:hidden flex items-center justify-between">
-                  <img src={gloveboxLogo} alt="Glovebox" className="h-9 w-auto" />
+                  <img src={gloveboxLogo} alt="Glovebox" className="h-11 w-auto" />
                   <div className="relative p-2" aria-hidden="true">
                     <Bell size={20} color="#fff" />
                     <span className="absolute top-2 right-2 w-2 h-2 rounded-full" style={{ backgroundColor: "#D64545" }} />
