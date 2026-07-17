@@ -13,7 +13,7 @@ import { loadData, saveData } from "./lib/storage";
 import { supabase, arrivedViaInviteOrRecovery } from "./lib/supabaseClient";
 import { parseDriversnoteCSV } from "./csv";
 import BenefitsFeature from "./benefits/BenefitsFeature";
-import gloveboxLogo from "./assets/glovebox-logo1.png";
+import gloveboxLogo from "./assets/glovebox-logo.png";
 
 /* ---------------------------------------------------------------
    Design tokens
@@ -796,7 +796,7 @@ function MethodCompareCard({ centsPerKmEstimate, logbookEstimate, logbookReady, 
 function AuthLogo() {
   return (
     <div className="flex justify-center mb-8">
-      <img src={gloveboxLogo} alt="Glovebox" className="h-20 w-auto" />
+      <img src={gloveboxLogo} alt="Glovebox" className="h-20 w-auto rounded-xl" />
     </div>
   );
 }
@@ -1375,7 +1375,7 @@ export default function App() {
       <div className="flex">
         <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 h-screen sticky top-0 border-r px-4 py-6 print:hidden" style={{ borderColor: GREY_LINE, backgroundColor: "#FFFFFF" }}>
           <div className="flex items-center gap-2 px-2 mb-8">
-            <img src={gloveboxLogo} alt="Glovebox" className="h-10 w-auto" />
+            <img src={gloveboxLogo} alt="Glovebox" className="h-10 w-auto rounded-lg" />
             <div className="text-[11px] text-[#8A93A3] leading-tight">{activeData.profile.fy}</div>
           </div>
           <nav className="flex flex-col gap-1">
@@ -1398,7 +1398,7 @@ export default function App() {
         {tab !== "overview" && (
           <div className="lg:hidden fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 border-b print:hidden" style={{ backgroundColor: "#FFFFFFF2", borderColor: GREY_LINE, backdropFilter: "blur(8px)" }}>
             <div className="flex items-center gap-2">
-              <img src={gloveboxLogo} alt="Glovebox" className="h-9 w-auto" />
+              <img src={gloveboxLogo} alt="Glovebox" className="h-9 w-auto rounded-md" />
             </div>
             <div className="relative p-2" aria-hidden="true"><Bell size={19} color={NAVY} /><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ backgroundColor: "#D64545" }} /></div>
           </div>
@@ -1428,7 +1428,7 @@ export default function App() {
             <div className="space-y-6">
               <div className="rounded-b-3xl lg:rounded-3xl -mx-4 sm:-mx-6 lg:mx-0 -mt-[68px] lg:mt-0 px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-6 fade-up" style={{ backgroundColor: NAVY }}>
                 <div className="lg:hidden flex items-center justify-between mb-5">
-                  <img src={gloveboxLogo} alt="Glovebox" className="h-9 w-auto" />
+                  <img src={gloveboxLogo} alt="Glovebox" className="h-9 w-auto rounded-md" />
                   <div className="relative p-2" aria-hidden="true">
                     <Bell size={20} color="#fff" />
                     <span className="absolute top-2 right-2 w-2 h-2 rounded-full" style={{ backgroundColor: "#D64545" }} />
