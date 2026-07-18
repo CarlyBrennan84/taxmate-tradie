@@ -35,4 +35,14 @@ body {
 
 @media print {
   aside, .print\:hidden { display: none !important; }
+  /* The Accountant Pack stays dark on-screen for consistency with the rest of
+     the app, but a dark background wastes toner and looks unprofessional on
+     paper — force plain black-on-white for the physical printout only. */
+  body, main, main * {
+    background: #fff !important;
+    background-image: none !important;
+    color: #000 !important;
+    border-color: #ddd !important;
+    box-shadow: none !important;
+  }
 }

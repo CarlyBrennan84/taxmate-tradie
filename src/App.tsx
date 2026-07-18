@@ -1130,18 +1130,18 @@ function AssistantModal({ messages, loading, onSend, onClose, disabled }: { mess
   );
 }
 
-function ReadinessItem({ ok, title, detail, cta, onGo }: { ok: boolean; title: string; detail: string; cta?: string; onGo?: () => void }) {
+function ReadinessItem({ ok, title, detail, cta, onGo, dark }: { ok: boolean; title: string; detail: string; cta?: string; onGo?: () => void; dark?: boolean }) {
   return (
-    <div className="flex items-start gap-3 py-3.5 border-b last:border-0" style={{ borderColor: GREY_LINE }}>
-      <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: ok ? TEAL_TINT : AMBER_TINT }}>
-        {ok ? <Check size={14} color={TEAL_DARK} strokeWidth={3} /> : <AlertTriangle size={13} color={AMBER} />}
+    <div className="flex items-start gap-3 py-3.5 border-b last:border-0" style={{ borderColor: dark ? "rgba(255,255,255,0.08)" : GREY_LINE }}>
+      <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: ok ? (dark ? "rgba(37,99,255,0.15)" : TEAL_TINT) : (dark ? "rgba(199,127,26,0.15)" : AMBER_TINT) }}>
+        {ok ? <Check size={14} color={dark ? TEAL : TEAL_DARK} strokeWidth={3} /> : <AlertTriangle size={13} color={AMBER} />}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium" style={{ color: NAVY }}>{title}</div>
-        <div className="text-xs mt-0.5" style={{ color: "#8A93A3" }}>{detail}</div>
+        <div className="text-sm font-medium" style={dark ? { color: "#fff" } : { color: NAVY }}>{title}</div>
+        <div className="text-xs mt-0.5" style={{ color: dark ? "#79879C" : "#8A93A3" }}>{detail}</div>
       </div>
       {!ok && cta && onGo && (
-        <button onClick={onGo} className="text-xs font-semibold flex-shrink-0 px-3 py-1.5 rounded-lg transition hover:brightness-105" style={{ backgroundColor: TEAL_TINT, color: TEAL_DARK }}>{cta}</button>
+        <button onClick={onGo} className="text-xs font-semibold flex-shrink-0 px-3 py-1.5 rounded-lg transition hover:brightness-105" style={{ backgroundColor: dark ? "rgba(37,99,255,0.15)" : TEAL_TINT, color: dark ? TEAL : TEAL_DARK }}>{cta}</button>
       )}
     </div>
   );
@@ -1810,7 +1810,7 @@ export default function App() {
           </div>
         </aside>
 
-        {tab !== "overview" && tab !== "vehicle" && tab !== "expenses" && tab !== "benefits" && (
+        {tab !== "overview" && tab !== "vehicle" && tab !== "expenses" && tab !== "benefits" && tab !== "progress" && tab !== "summary" && tab !== "settings" && (
           <div className="lg:hidden fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 border-b print:hidden" style={{ backgroundColor: "#FFFFFFF2", borderColor: GREY_LINE, backdropFilter: "blur(8px)" }}>
             <div className="flex items-center gap-2">
               <img src={gloveboxLogo} alt="Glovebox" className="h-11 w-auto" />
@@ -1984,106 +1984,120 @@ export default function App() {
           )}
 
           {tab === "progress" && (
-            <div className="space-y-4">
-              <SectionTitle title="Progress" />
-
-              {(() => {
-                const readyMessage = readyPct >= 0.8 ? "You're almost there! 🎉" : readyPct >= 0.4 ? "You're making great progress! 🎉" : "Let's get your claim sorted.";
-                return (
-                  <div className="rounded-3xl p-6 fade-up text-white" style={{ background: `linear-gradient(135deg, ${NAVY} 0%, ${TEAL_DARK} 100%)` }}>
-                    <div className="text-xs font-semibold uppercase tracking-wide text-white/70">Tax Ready</div>
-                    <div className="text-5xl font-bold mt-1 tabular">{Math.round(readyPct * 100)}%</div>
-                    <div className="mt-3">
-                      <AnimatedBar pct={readyPct} color="#fff" />
-                    </div>
-                    <div className="text-sm mt-3 text-white/90">{readyMessage}</div>
-                    <div className="mt-4 pt-4 space-y-2.5" style={{ borderTop: "1px solid rgba(255,255,255,0.2)" }}>
-                      {taxReadySummary.map((s) => (
-                        <div key={s.label} className="flex items-center gap-2.5 text-sm">
-                          <s.icon size={15} className="text-white/70 flex-shrink-0" />
-                          <span className="flex-1">{s.label}</span>
-                          {s.done ? <CheckCircle2 size={16} className="text-white flex-shrink-0" /> : <div className="w-4 h-4 rounded-full border-2 border-white/40 flex-shrink-0" />}
-                        </div>
-                      ))}
-                    </div>
+            <div className="-mx-4 sm:-mx-6 lg:mx-0 -mt-[68px] lg:mt-0 min-h-screen lg:min-h-0 lg:rounded-3xl fade-up" style={{ backgroundColor: "#081425" }}>
+              <div className="px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-28 lg:pb-10 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}>
+                    <Zap size={18} color="#fff" fill="#fff" />
                   </div>
-                );
-              })()}
-
-              <Card className="p-6 text-center">
-                <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#8A93A3" }}>Estimated Refund</div>
-                <div className="text-2xl font-bold tabular mt-0.5" style={{ color: NAVY }}><AnimatedNumber value={Math.max(0, estimatedRefund)} /></div>
-                {weeklyDelta > 0 && (
-                  <div className="inline-flex items-center gap-1 mt-2 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: TEAL_TINT, color: TEAL_DARK }}>
-                    <TrendingUp size={12} /> {fmt(weeklyDelta)} this week
+                  <div className="min-w-0">
+                    <div className="text-xl font-bold text-white">Progress</div>
+                    <div className="text-xs mt-0.5 truncate" style={{ color: "#79879C" }}>Everything left before tax time.</div>
                   </div>
-                )}
-              </Card>
-
-              {readinessChecks.filter((c) => !c.ok).length > 0 && (
-                <Card className="p-2">
-                  <div className="px-3 pt-2 pb-1 text-xs font-semibold" style={{ color: NAVY_SOFT }}>What's left</div>
-                  {readinessChecks.filter((c) => !c.ok).map((c) => <ReadinessItem key={c.key} ok={c.ok} title={c.title} detail={c.detail} cta={c.cta} onGo={c.onGo} />)}
-                </Card>
-              )}
-
-              <button onClick={() => setTab("summary")} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold border bg-white transition hover:brightness-95" style={{ borderColor: GREY_LINE, color: NAVY }}>
-                <FileText size={15} color={TEAL_DARK} />
-                View Accountant Pack
-              </button>
-
-              <SectionTitle title="Receipts" />
-
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Search size={15} color="#B7BEC9" className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input value={receiptSearch} onChange={(e) => setReceiptSearch(e.target.value)} placeholder="Search receipts…" className={`${inputCls} pl-9`} />
                 </div>
-                <button
-                  onClick={() => setShowReceiptFilters((v) => !v)}
-                  className="relative p-2.5 rounded-xl border flex-shrink-0 transition"
-                  style={showReceiptFilters || receiptCategoryFilter !== "all" ? { backgroundColor: TEAL_TINT, borderColor: TEAL_TINT, color: TEAL_DARK } : { borderColor: GREY_LINE, color: NAVY_SOFT }}
-                  aria-label="Filters"
-                >
-                  <SlidersHorizontal size={16} />
-                  {receiptCategoryFilter !== "all" && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full" style={{ backgroundColor: TEAL }} />}
-                </button>
-              </div>
 
-              {showReceiptFilters && (
-                <div className="flex items-center gap-2 flex-wrap fade-up">
-                  <button onClick={() => setReceiptCategoryFilter("all")} className="px-3 py-1.5 rounded-full text-xs font-medium transition" style={receiptCategoryFilter === "all" ? { backgroundColor: NAVY, color: "#fff" } : { backgroundColor: "#F0F1F4", color: "#5B6472" }}>All</button>
-                  {CATEGORIES.map((c) => (
-                    <button key={c.key} onClick={() => setReceiptCategoryFilter(c.key)} className="px-3 py-1.5 rounded-full text-xs font-medium transition" style={receiptCategoryFilter === c.key ? { backgroundColor: NAVY, color: "#fff" } : { backgroundColor: "#F0F1F4", color: "#5B6472" }}>{c.label}</button>
-                  ))}
-                </div>
-              )}
+                {(() => {
+                  const readyMessage = readyPct >= 0.8 ? "You're almost there! 🎉" : readyPct >= 0.4 ? "You're making great progress! 🎉" : "Let's get your claim sorted.";
+                  return (
+                    <div className="rounded-3xl p-6 text-white" style={{ background: `linear-gradient(135deg, ${NAVY} 0%, ${TEAL_DARK} 100%)` }}>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-white/70">Tax Ready</div>
+                      <div className="text-5xl font-bold mt-1 tabular">{Math.round(readyPct * 100)}%</div>
+                      <div className="mt-3">
+                        <AnimatedBar pct={readyPct} color="#fff" trackColor="rgba(255,255,255,0.15)" />
+                      </div>
+                      <div className="text-sm mt-3 text-white/90">{readyMessage}</div>
+                      <div className="mt-4 pt-4 space-y-2.5" style={{ borderTop: "1px solid rgba(255,255,255,0.2)" }}>
+                        {taxReadySummary.map((s) => (
+                          <div key={s.label} className="flex items-center gap-2.5 text-sm">
+                            <s.icon size={15} className="text-white/70 flex-shrink-0" />
+                            <span className="flex-1">{s.label}</span>
+                            {s.done ? <CheckCircle2 size={16} className="text-white flex-shrink-0" /> : <div className="w-4 h-4 rounded-full border-2 border-white/40 flex-shrink-0" />}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
 
-              <div className="flex items-center gap-2">
-                {receiptSegments.map((s) => (
-                  <button
-                    key={s.key}
-                    onClick={() => setReceiptSegment(s.key)}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium transition flex-1 justify-center"
-                    style={receiptSegment === s.key ? { backgroundColor: TEAL_TINT, color: TEAL_DARK } : { backgroundColor: "#F0F1F4", color: "#5B6472" }}
-                  >
-                    {s.label}
-                    {s.key === "needsAttention" && s.list.length > 0 && (
-                      <span className="text-[10px] font-bold px-1.5 rounded-full" style={{ backgroundColor: AMBER, color: "#fff" }}>{s.list.length}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-
-              <Card className="p-2 sm:p-4">
-                <div className="px-2">
-                  {receiptsForTab.length === 0 ? (
-                    <EmptyState icon={Receipt} title="Nothing here" subtitle="Tap the + button to scan a receipt — Glovebox will sort it into the right category." />
-                  ) : (
-                    receiptsForTab.map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} onEdit={setEditingReceipt} />)
+                <div className="rounded-2xl p-6 text-center" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#79879C" }}>Estimated Refund</div>
+                  <div className="text-2xl font-bold tabular mt-0.5 text-white"><AnimatedNumber value={Math.max(0, estimatedRefund)} /></div>
+                  {weeklyDelta > 0 && (
+                    <div className="inline-flex items-center gap-1 mt-2 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: "rgba(37,99,255,0.15)", color: TEAL }}>
+                      <TrendingUp size={12} /> {fmt(weeklyDelta)} this week
+                    </div>
                   )}
                 </div>
-              </Card>
+
+                {readinessChecks.filter((c) => !c.ok).length > 0 && (
+                  <div className="rounded-2xl p-2" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                    <div className="px-3 pt-2 pb-1 text-xs font-semibold" style={{ color: "#AEB9CB" }}>What's left</div>
+                    {readinessChecks.filter((c) => !c.ok).map((c) => <ReadinessItem key={c.key} ok={c.ok} title={c.title} detail={c.detail} cta={c.cta} onGo={c.onGo} dark />)}
+                  </div>
+                )}
+
+                <button onClick={() => setTab("summary")} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold border transition hover:bg-white/5" style={{ borderColor: "rgba(255,255,255,0.14)", color: "#fff" }}>
+                  <FileText size={15} style={{ color: TEAL }} />
+                  View Accountant Pack
+                </button>
+
+                <div className="text-sm font-semibold text-white pt-2">Receipts</div>
+
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search size={15} style={{ color: "#79879C" }} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input value={receiptSearch} onChange={(e) => setReceiptSearch(e.target.value)} placeholder="Search receipts…" className={`${darkInputCls} pl-9`} style={darkFieldBg} />
+                  </div>
+                  <button
+                    onClick={() => setShowReceiptFilters((v) => !v)}
+                    className="relative p-2.5 rounded-xl border flex-shrink-0 transition"
+                    style={showReceiptFilters || receiptCategoryFilter !== "all" ? { backgroundColor: "rgba(37,99,255,0.15)", borderColor: "rgba(37,99,255,0.15)", color: TEAL } : { borderColor: "rgba(255,255,255,0.14)", color: "#AEB9CB" }}
+                    aria-label="Filters"
+                  >
+                    <SlidersHorizontal size={16} />
+                    {receiptCategoryFilter !== "all" && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full" style={{ backgroundColor: TEAL }} />}
+                  </button>
+                </div>
+
+                {showReceiptFilters && (
+                  <div className="flex items-center gap-2 flex-wrap fade-up">
+                    <button onClick={() => setReceiptCategoryFilter("all")} className="px-3 py-1.5 rounded-full text-xs font-medium transition" style={receiptCategoryFilter === "all" ? { backgroundColor: TEAL, color: "#fff" } : { backgroundColor: "rgba(255,255,255,0.08)", color: "#AEB9CB" }}>All</button>
+                    {CATEGORIES.map((c) => (
+                      <button key={c.key} onClick={() => setReceiptCategoryFilter(c.key)} className="px-3 py-1.5 rounded-full text-xs font-medium transition" style={receiptCategoryFilter === c.key ? { backgroundColor: TEAL, color: "#fff" } : { backgroundColor: "rgba(255,255,255,0.08)", color: "#AEB9CB" }}>{c.label}</button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2">
+                  {receiptSegments.map((s) => (
+                    <button
+                      key={s.key}
+                      onClick={() => setReceiptSegment(s.key)}
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium transition flex-1 justify-center"
+                      style={receiptSegment === s.key ? { backgroundColor: "rgba(37,99,255,0.15)", color: TEAL } : { backgroundColor: "rgba(255,255,255,0.08)", color: "#AEB9CB" }}
+                    >
+                      {s.label}
+                      {s.key === "needsAttention" && s.list.length > 0 && (
+                        <span className="text-[10px] font-bold px-1.5 rounded-full" style={{ backgroundColor: AMBER, color: "#fff" }}>{s.list.length}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="rounded-2xl p-2 sm:p-4" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div className="px-2">
+                    {receiptsForTab.length === 0 ? (
+                      <div className="py-10 text-center">
+                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: "rgba(37,99,255,0.15)" }}><Receipt size={20} style={{ color: TEAL }} /></div>
+                        <p className="text-sm font-semibold text-white">Nothing here</p>
+                        <p className="text-xs mt-1" style={{ color: "#79879C" }}>Tap the + button to scan a receipt — Glovebox will sort it into the right category.</p>
+                      </div>
+                    ) : (
+                      receiptsForTab.map((r) => <ReceiptRow key={r.id} r={r} onDelete={deleteReceipt} onEdit={setEditingReceipt} dark />)
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -2545,60 +2559,68 @@ export default function App() {
           )}
 
           {tab === "summary" && (
-            <div className="space-y-6">
-              <button onClick={() => setTab("progress")} className="flex items-center gap-1 text-xs font-semibold print:hidden" style={{ color: TEAL_DARK }}>
-                <ChevronRight size={13} style={{ transform: "rotate(180deg)" }} /> Back to Progress
-              </button>
-              <SectionTitle title="Accountant Pack" eyebrow="Print or export, ready to send"
-                action={<div className="flex gap-2 print:hidden">
-                  <button onClick={exportCSV} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold border transition hover:bg-[#F6F7F9]" style={{ borderColor: GREY_LINE, color: NAVY }}><Download size={15} />Export CSV</button>
-                  <button onClick={() => window.print()} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white shadow-sm hover:brightness-110 transition" style={{ backgroundColor: TEAL }}><Printer size={15} />Print</button>
-                </div>} />
+            <div className="-mx-4 sm:-mx-6 lg:mx-0 -mt-[68px] lg:mt-0 min-h-screen lg:min-h-0 lg:rounded-3xl fade-up print:bg-white" style={{ backgroundColor: "#081425" }}>
+              <div className="px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-28 lg:pb-10 space-y-4">
+                <button onClick={() => setTab("progress")} className="flex items-center gap-1 text-xs font-semibold print:hidden" style={{ color: TEAL }}>
+                  <ChevronRight size={13} style={{ transform: "rotate(180deg)" }} /> Back to Progress
+                </button>
 
-              <Card className="p-4 flex items-center gap-3" style={{ backgroundColor: accountantReady ? TEAL_TINT : AMBER_TINT }}>
-                {accountantReady ? <CheckCircle2 size={18} color={TEAL_DARK} /> : <AlertTriangle size={16} color={AMBER} />}
-                <div className="text-sm font-medium" style={{ color: accountantReady ? TEAL_DARK : "#8A5A0F" }}>{accountantReady ? "This pack is ready to send to your accountant." : "A few things on Progress still need attention before this pack is fully ready."}</div>
-              </Card>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {[["Gross income", fmt(income)], ["Total deductions", fmt(totalDeductions)], ["Tax withheld", fmt(withheld)], ["Est. refund / owing", fmt(estimatedRefund)]].map(([l, v], i) => (
-                  <Card key={l} className="p-4" delay={i * 40}><div className="text-[11px] font-medium" style={{ color: "#8A93A3" }}>{l}</div><div className="text-lg font-bold tabular mt-1" style={{ color: NAVY }}>{v}</div></Card>
-                ))}
-              </div>
-              <Card className="p-6">
-                <SectionTitle title="Deductions by category" />
-                <div className="divide-y" style={{ borderColor: GREY_LINE }}>
-                  {categoryTotals.map((c) => (
-                    <div key={c.key} className="flex items-center justify-between py-2.5">
-                      <div className="flex items-center gap-2 text-sm" style={{ color: NAVY }}><c.icon size={14} color={TEAL_DARK} />{c.label}</div>
-                      <div className="text-sm font-semibold tabular" style={{ color: NAVY }}>{fmt(c.deductible)}</div>
-                    </div>
-                  ))}
-                  <div className="flex items-center justify-between py-2.5">
-                    <div className="flex items-center gap-2 text-sm" style={{ color: NAVY }}><Shirt size={14} color={TEAL_DARK} />Laundry & uniform estimate</div>
-                    <div className="text-sm font-semibold tabular" style={{ color: NAVY }}>{fmt(laundryEstimate)}</div>
+                <div className="flex items-start justify-between flex-wrap gap-3">
+                  <div>
+                    <div className="text-[11px] font-semibold tracking-wide uppercase mb-1" style={{ color: TEAL }}>Print or export, ready to send</div>
+                    <h1 className="text-xl font-bold text-white">Accountant Pack</h1>
+                  </div>
+                  <div className="flex gap-2 print:hidden">
+                    <button onClick={exportCSV} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold border transition hover:bg-white/5" style={{ borderColor: "rgba(255,255,255,0.14)", color: "#fff" }}><Download size={15} />Export CSV</button>
+                    <button onClick={() => window.print()} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition hover:brightness-110" style={{ backgroundColor: TEAL }}><Printer size={15} />Print</button>
                   </div>
                 </div>
-              </Card>
-              <Card className="p-6">
-                <SectionTitle title="Vehicle logbook status" />
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div><div className="text-lg font-bold tabular" style={{ color: NAVY }}>{Math.round(businessKm)} km</div><div className="text-[11px]" style={{ color: "#8A93A3" }}>Business</div></div>
-                  <div><div className="text-lg font-bold tabular" style={{ color: NAVY }}>{Math.round(personalKm)} km</div><div className="text-[11px]" style={{ color: "#8A93A3" }}>Personal</div></div>
-                  <div><div className="text-lg font-bold tabular" style={{ color: TEAL_DARK }}>{businessPct}%</div><div className="text-[11px]" style={{ color: "#8A93A3" }}>Business use</div></div>
+
+                <div className="rounded-2xl p-4 flex items-center gap-3" style={{ backgroundColor: accountantReady ? "rgba(37,99,255,0.15)" : "rgba(199,127,26,0.15)" }}>
+                  {accountantReady ? <CheckCircle2 size={18} style={{ color: TEAL }} /> : <AlertTriangle size={16} color={AMBER} />}
+                  <div className="text-sm font-medium" style={{ color: accountantReady ? TEAL : AMBER }}>{accountantReady ? "This pack is ready to send to your accountant." : "A few things on Progress still need attention before this pack is fully ready."}</div>
                 </div>
-              </Card>
-              <Card className="p-6">
-                <SectionTitle title="Outstanding items" />
-                {readinessChecks.filter((c) => !c.ok).length === 0 ? (
-                  <p className="text-sm" style={{ color: NAVY_SOFT }}>Nothing outstanding — you're in great shape for tax time.</p>
-                ) : (
-                  <ul className="space-y-1.5">
-                    {readinessChecks.filter((c) => !c.ok).map((c) => <li key={c.key} className="text-xs flex items-center gap-2" style={{ color: "#8A93A3" }}><span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: AMBER }} />{c.title}</li>)}
-                  </ul>
-                )}
-              </Card>
-              <p className="text-xs text-center pb-4" style={{ color: "#B7BEC9" }}>This dashboard is a record-keeping tool, not tax advice. Confirm deductibility with a registered tax agent.</p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[["Gross income", fmt(income)], ["Total deductions", fmt(totalDeductions)], ["Tax withheld", fmt(withheld)], ["Est. refund / owing", fmt(estimatedRefund)]].map(([l, v]) => (
+                    <div key={l} className="rounded-2xl p-4" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}><div className="text-[11px] font-medium" style={{ color: "#79879C" }}>{l}</div><div className="text-lg font-bold tabular mt-1 text-white">{v}</div></div>
+                  ))}
+                </div>
+                <div className="rounded-2xl p-6" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div className="text-sm font-semibold text-white mb-3">Deductions by category</div>
+                  <div className="divide-y" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+                    {categoryTotals.map((c) => (
+                      <div key={c.key} className="flex items-center justify-between py-2.5">
+                        <div className="flex items-center gap-2 text-sm text-white"><c.icon size={14} style={{ color: TEAL }} />{c.label}</div>
+                        <div className="text-sm font-semibold tabular text-white">{fmt(c.deductible)}</div>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between py-2.5">
+                      <div className="flex items-center gap-2 text-sm text-white"><Shirt size={14} style={{ color: TEAL }} />Laundry & uniform estimate</div>
+                      <div className="text-sm font-semibold tabular text-white">{fmt(laundryEstimate)}</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-2xl p-6" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div className="text-sm font-semibold text-white mb-3">Vehicle logbook status</div>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div><div className="text-lg font-bold tabular text-white">{Math.round(businessKm)} km</div><div className="text-[11px]" style={{ color: "#79879C" }}>Business</div></div>
+                    <div><div className="text-lg font-bold tabular text-white">{Math.round(personalKm)} km</div><div className="text-[11px]" style={{ color: "#79879C" }}>Personal</div></div>
+                    <div><div className="text-lg font-bold tabular" style={{ color: TEAL }}>{businessPct}%</div><div className="text-[11px]" style={{ color: "#79879C" }}>Business use</div></div>
+                  </div>
+                </div>
+                <div className="rounded-2xl p-6" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div className="text-sm font-semibold text-white mb-3">Outstanding items</div>
+                  {readinessChecks.filter((c) => !c.ok).length === 0 ? (
+                    <p className="text-sm" style={{ color: "#AEB9CB" }}>Nothing outstanding — you're in great shape for tax time.</p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {readinessChecks.filter((c) => !c.ok).map((c) => <li key={c.key} className="text-xs flex items-center gap-2" style={{ color: "#79879C" }}><span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: AMBER }} />{c.title}</li>)}
+                    </ul>
+                  )}
+                </div>
+                <p className="text-xs text-center pb-4" style={{ color: "#79879C" }}>This dashboard is a record-keeping tool, not tax advice. Confirm deductibility with a registered tax agent.</p>
+              </div>
             </div>
           )}
 
@@ -2620,66 +2642,80 @@ export default function App() {
           )}
 
           {tab === "settings" && (
-            <div className="space-y-6">
-              <SectionTitle title="Settings" sub="Manage your profile, vehicle and deduction details." />
-
-              <Card className="p-5">
-                <SectionTitle title="Profile & tax details" eyebrow="Used across your dashboard and accountant summary" />
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label="Your name"><input value={activeData.profile.name} onChange={(e) => setProfile("name", e.target.value)} placeholder="Optional" className={inputCls} /></Field>
-                  <Field label="Occupation"><input value={activeData.profile.occupation} onChange={(e) => setProfile("occupation", e.target.value)} className={inputCls} /></Field>
-                  <Field label="Income ($)"><input type="number" value={activeData.profile.income} onChange={(e) => setProfile("income", Number(e.target.value))} className={inputCls} /></Field>
-                  <Field label="Tax withheld ($)"><input type="number" value={activeData.profile.taxWithheld} onChange={(e) => setProfile("taxWithheld", Number(e.target.value))} className={inputCls} /></Field>
+            <div className="-mx-4 sm:-mx-6 lg:mx-0 -mt-[68px] lg:mt-0 min-h-screen lg:min-h-0 lg:rounded-3xl fade-up" style={{ backgroundColor: "#081425" }}>
+              <div className="px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-28 lg:pb-10 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}>
+                    <Zap size={18} color="#fff" fill="#fff" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xl font-bold text-white">Settings</div>
+                    <div className="text-xs mt-0.5 truncate" style={{ color: "#79879C" }}>Manage your profile, vehicle and deduction details.</div>
+                  </div>
                 </div>
-              </Card>
 
-              <Card className="p-5">
-                <SectionTitle title="Vehicle details" eyebrow="Used for your logbook and odometer tracking" />
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label="Make"><input value={activeData.profile.vehicle.make} onChange={(e) => setVehicle("make", e.target.value)} className={inputCls} placeholder="Toyota" /></Field>
-                  <Field label="Model"><input value={activeData.profile.vehicle.model} onChange={(e) => setVehicle("model", e.target.value)} className={inputCls} placeholder="HiLux" /></Field>
-                  <Field label="Rego"><input value={activeData.profile.vehicle.rego} onChange={(e) => setVehicle("rego", e.target.value)} className={inputCls} placeholder="1AB2CD" /></Field>
-                  <Field label="Opening odometer (km)"><input type="number" value={activeData.profile.vehicle.openingOdometer} onChange={(e) => setVehicle("openingOdometer", Number(e.target.value))} className={inputCls} /></Field>
+                <div className="rounded-2xl p-5" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div className="text-[11px] font-semibold tracking-wide uppercase mb-1" style={{ color: TEAL }}>Used across your dashboard and accountant summary</div>
+                  <h2 className="text-lg font-semibold text-white mb-4">Profile & tax details</h2>
+                  <div className="grid grid-cols-2 gap-4">
+                    <DarkField label="Your name"><input value={activeData.profile.name} onChange={(e) => setProfile("name", e.target.value)} placeholder="Optional" className={darkInputCls} style={darkFieldBg} /></DarkField>
+                    <DarkField label="Occupation"><input value={activeData.profile.occupation} onChange={(e) => setProfile("occupation", e.target.value)} className={darkInputCls} style={darkFieldBg} /></DarkField>
+                    <DarkField label="Income ($)"><input type="number" value={activeData.profile.income} onChange={(e) => setProfile("income", Number(e.target.value))} className={darkInputCls} style={darkFieldBg} /></DarkField>
+                    <DarkField label="Tax withheld ($)"><input type="number" value={activeData.profile.taxWithheld} onChange={(e) => setProfile("taxWithheld", Number(e.target.value))} className={darkInputCls} style={darkFieldBg} /></DarkField>
+                  </div>
                 </div>
-              </Card>
 
-              <Card className="p-5">
-                <SectionTitle title="Other common deductions" eyebrow="No receipts needed under ATO thresholds" />
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label={`Laundry & uniform estimate (up to $${LAUNDRY_ATO_CAP} without receipts)`}>
-                    <input type="number" value={activeData.profile.laundryEstimate} onChange={(e) => setProfile("laundryEstimate", Number(e.target.value))} className={inputCls} />
-                  </Field>
-                  <Field label="Phone & internet work-use %">
-                    <input type="number" min={0} max={100} value={activeData.profile.phoneWorkPct} onChange={(e) => setProfile("phoneWorkPct", Number(e.target.value))} className={inputCls} />
-                  </Field>
+                <div className="rounded-2xl p-5" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div className="text-[11px] font-semibold tracking-wide uppercase mb-1" style={{ color: TEAL }}>Used for your logbook and odometer tracking</div>
+                  <h2 className="text-lg font-semibold text-white mb-4">Vehicle details</h2>
+                  <div className="grid grid-cols-2 gap-4">
+                    <DarkField label="Make"><input value={activeData.profile.vehicle.make} onChange={(e) => setVehicle("make", e.target.value)} className={darkInputCls} style={darkFieldBg} placeholder="Toyota" /></DarkField>
+                    <DarkField label="Model"><input value={activeData.profile.vehicle.model} onChange={(e) => setVehicle("model", e.target.value)} className={darkInputCls} style={darkFieldBg} placeholder="HiLux" /></DarkField>
+                    <DarkField label="Rego"><input value={activeData.profile.vehicle.rego} onChange={(e) => setVehicle("rego", e.target.value)} className={darkInputCls} style={darkFieldBg} placeholder="1AB2CD" /></DarkField>
+                    <DarkField label="Opening odometer (km)"><input type="number" value={activeData.profile.vehicle.openingOdometer} onChange={(e) => setVehicle("openingOdometer", Number(e.target.value))} className={darkInputCls} style={darkFieldBg} /></DarkField>
+                  </div>
                 </div>
-                <p className="text-xs mt-3 leading-relaxed" style={{ color: "#8A93A3" }}>The ATO allows a reasonable estimate for laundering work uniforms without keeping receipts, up to ${LAUNDRY_ATO_CAP} a year. Your phone % should reflect genuine work use — check a typical bill if you're not sure.</p>
-              </Card>
 
-              <Card className="p-5">
-                <SectionTitle title="AI travel memory" eyebrow="What Glovebox AI remembers when you log trips" />
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label="Home address">
-                    <input value={activeData.profile.homeAddress || ""} onChange={(e) => updateTravelProfile({ homeAddress: e.target.value })} placeholder="e.g. 18 Maureen Close, Cranbourne West" className={inputCls} />
-                  </Field>
-                  <Field label="Usual trip type">
-                    <select value={activeData.profile.assumeRoundTrip === false ? "one_way" : "round_trip"} onChange={(e) => updateTravelProfile({ assumeRoundTrip: e.target.value === "round_trip" })} className={inputCls}>
-                      <option value="round_trip">Round trip (there and back)</option>
-                      <option value="one_way">One-way</option>
-                    </select>
-                  </Field>
+                <div className="rounded-2xl p-5" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div className="text-[11px] font-semibold tracking-wide uppercase mb-1" style={{ color: TEAL }}>No receipts needed under ATO thresholds</div>
+                  <h2 className="text-lg font-semibold text-white mb-4">Other common deductions</h2>
+                  <div className="grid grid-cols-2 gap-4">
+                    <DarkField label={`Laundry & uniform estimate (up to $${LAUNDRY_ATO_CAP} without receipts)`}>
+                      <input type="number" value={activeData.profile.laundryEstimate} onChange={(e) => setProfile("laundryEstimate", Number(e.target.value))} className={darkInputCls} style={darkFieldBg} />
+                    </DarkField>
+                    <DarkField label="Phone & internet work-use %">
+                      <input type="number" min={0} max={100} value={activeData.profile.phoneWorkPct} onChange={(e) => setProfile("phoneWorkPct", Number(e.target.value))} className={darkInputCls} style={darkFieldBg} />
+                    </DarkField>
+                  </div>
+                  <p className="text-xs mt-3 leading-relaxed" style={{ color: "#79879C" }}>The ATO allows a reasonable estimate for laundering work uniforms without keeping receipts, up to ${LAUNDRY_ATO_CAP} a year. Your phone % should reflect genuine work use — check a typical bill if you're not sure.</p>
                 </div>
-                <p className="text-xs mt-3 leading-relaxed" style={{ color: "#8A93A3" }}>Glovebox AI uses these so it doesn't have to ask every time you log a trip — it'll also update them automatically as you chat.</p>
-              </Card>
 
-              <Card className="p-5">
-                <SectionTitle title="Account" />
-                <div className="flex flex-wrap gap-2">
-                  <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition" style={{ borderColor: GREY_LINE, color: NAVY_SOFT }}>
-                    <LogOut size={15} /> Log out
-                  </button>
+                <div className="rounded-2xl p-5" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div className="text-[11px] font-semibold tracking-wide uppercase mb-1" style={{ color: TEAL }}>What Glovebox AI remembers when you log trips</div>
+                  <h2 className="text-lg font-semibold text-white mb-4">AI travel memory</h2>
+                  <div className="grid grid-cols-2 gap-4">
+                    <DarkField label="Home address">
+                      <input value={activeData.profile.homeAddress || ""} onChange={(e) => updateTravelProfile({ homeAddress: e.target.value })} placeholder="e.g. 18 Maureen Close, Cranbourne West" className={darkInputCls} style={darkFieldBg} />
+                    </DarkField>
+                    <DarkField label="Usual trip type">
+                      <select value={activeData.profile.assumeRoundTrip === false ? "one_way" : "round_trip"} onChange={(e) => updateTravelProfile({ assumeRoundTrip: e.target.value === "round_trip" })} className={darkInputCls} style={darkFieldBg}>
+                        <option value="round_trip">Round trip (there and back)</option>
+                        <option value="one_way">One-way</option>
+                      </select>
+                    </DarkField>
+                  </div>
+                  <p className="text-xs mt-3 leading-relaxed" style={{ color: "#79879C" }}>Glovebox AI uses these so it doesn't have to ask every time you log a trip — it'll also update them automatically as you chat.</p>
                 </div>
-              </Card>
+
+                <div className="rounded-2xl p-5" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <h2 className="text-lg font-semibold text-white mb-4">Account</h2>
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition hover:bg-white/5" style={{ borderColor: "rgba(255,255,255,0.14)", color: "#AEB9CB" }}>
+                      <LogOut size={15} /> Log out
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </main>
