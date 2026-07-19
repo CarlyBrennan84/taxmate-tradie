@@ -240,25 +240,25 @@ export function EmptyState({ icon: Icon, title, subtitle, action }: { icon: Reac
 }
 
 function RadialProgress({
-  pct, label, size = 88, trackColor = "rgba(255,255,255,0.2)", progressColor = "#fff", textColor = "#fff", labelColor = "rgba(255,255,255,0.8)",
-}: { pct: number; label: string; size?: number; trackColor?: string; progressColor?: string; textColor?: string; labelColor?: string }) {
-  const stroke = 7;
-  const r = (size - stroke) / 2;
+  pct, label, size = 88, stroke, trackColor = "rgba(255,255,255,0.2)", progressColor = "#fff", textColor = "#fff", labelColor = "rgba(255,255,255,0.8)", valueClassName = "text-base font-bold", labelClassName = "text-[10px] font-medium",
+}: { pct: number; label: string; size?: number; stroke?: number; trackColor?: string; progressColor?: string; textColor?: string; labelColor?: string; valueClassName?: string; labelClassName?: string }) {
+  const strokeWidth = stroke ?? Math.max(6, Math.round(size / 13));
+  const r = (size - strokeWidth) / 2;
   const c = 2 * Math.PI * r;
   const clamped = Math.max(0, Math.min(1, pct));
   return (
     <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={trackColor} strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={trackColor} strokeWidth={strokeWidth} />
         <circle
-          cx={size / 2} cy={size / 2} r={r} fill="none" stroke={progressColor} strokeWidth={stroke} strokeLinecap="round"
+          cx={size / 2} cy={size / 2} r={r} fill="none" stroke={progressColor} strokeWidth={strokeWidth} strokeLinecap="round"
           strokeDasharray={c} strokeDashoffset={c * (1 - clamped)} style={{ transition: "stroke-dashoffset 700ms ease" }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-base font-bold tabular" style={{ color: textColor }}>{Math.round(clamped * 100)}%</span>
+        <span className={`${valueClassName} tabular`} style={{ color: textColor }}>{Math.round(clamped * 100)}%</span>
       </div>
-      <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap" style={{ color: labelColor }}>{label}</div>
+      {label && <div className={`absolute -bottom-5 left-1/2 -translate-x-1/2 ${labelClassName} whitespace-nowrap`} style={{ color: labelColor }}>{label}</div>}
     </div>
   );
 }
@@ -1263,6 +1263,7 @@ export default function App() {
   const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
   const [assistantLoading, setAssistantLoading] = useState(false);
   const [showScanCapture, setShowScanCapture] = useState(false);
+  const [winMessageIndex, setWinMessageIndex] = useState(0);
   const csvInputRef = useRef<HTMLInputElement>(null);
   const receiptInputRef = useRef<HTMLInputElement>(null);
   const receiptCameraInputRef = useRef<HTMLInputElement>(null);
@@ -1287,6 +1288,11 @@ export default function App() {
     saveTimerRef.current = window.setTimeout(() => { saveData(data, session.user.id); }, 800);
     return () => { if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current); };
   }, [data, session]);
+
+  useEffect(() => {
+    const t = window.setInterval(() => setWinMessageIndex((i) => i + 1), 6000);
+    return () => window.clearInterval(t);
+  }, []);
 
   const handleLogout = async () => { if (supabase) await supabase.auth.signOut(); };
 
@@ -1680,9 +1686,7 @@ export default function App() {
   ];
   const readinessScore = readinessChecks.filter((c) => c.ok).length;
   const readyPct = readinessChecks.length ? readinessScore / readinessChecks.length : 0;
-  const todaysTasks = readinessChecks.filter((c) => !c.ok && c.key !== "accountant").slice(0, 3);
-  const laundryOpportunity = laundryAdded ? 0 : LAUNDRY_ATO_CAP;
-  const laundryTaxBenefit = laundryOpportunity > 0 ? taxAfter - totalTax(Math.max(0, income - totalDeductions - laundryOpportunity)) : 0;
+  const readyMessage = readyPct >= 0.8 ? "You're almost there! 🎉" : readyPct >= 0.4 ? "You're making great progress! 🎉" : "Let's get your claim sorted.";
   const greetingHour = new Date().getHours();
   const greeting = greetingHour < 12 ? "Good morning" : greetingHour < 18 ? "Good afternoon" : "Good evening";
 
@@ -1745,6 +1749,24 @@ export default function App() {
     if (!laundryEstimate) return { text: "Add a laundry estimate — up to $150 without receipts.", action: () => setTab("expenses") };
     return null;
   })();
+
+  // "Today's Win" — every message here is computed from real data, never invented copy.
+  const todayAddedDeduction = (() => {
+    const t = todayISO();
+    const todayBusinessKm = trips.filter((tr) => tr.date === t && tr.type === "business").reduce((s, tr) => s + (Number(tr.km) || 0), 0);
+    const todayReceiptDeduction = receiptsWithNum.filter((r) => r.date === t).reduce((s, r) => s + r.amount * (r.workPct / 100), 0);
+    return todayBusinessKm * CENTS_PER_KM_RATE + todayReceiptDeduction;
+  })();
+  const logbookDaysLeft = firstTripDate ? Math.max(0, 84 - Math.min(daysElapsed, 84)) : null;
+  const avgReceiptDeductible = receiptsWithNum.length > 0 ? receiptsWithNum.reduce((s, r) => s + r.amount * (r.workPct / 100), 0) / receiptsWithNum.length : 0;
+
+  const todaysWinMessages: { text: string; action: () => void }[] = [
+    todayAddedDeduction > 0 ? { text: `You've already added ${fmtDec(todayAddedDeduction)} to your refund today.`, action: () => setTab("expenses") } : null,
+    logbookDaysLeft !== null && logbookDaysLeft > 0 ? { text: `Only ${logbookDaysLeft} more logbook day${logbookDaysLeft === 1 ? "" : "s"} to complete your vehicle claim.`, action: () => setTab("vehicle") } : null,
+    avgReceiptDeductible > 0 ? { text: `One more receipt today could add another ${fmtDec(avgReceiptDeductible)}.`, action: quickUploadReceipt } : null,
+  ].filter((m): m is { text: string; action: () => void } => m !== null);
+  if (todaysWinMessages.length === 0) todaysWinMessages.push({ text: "Every trip and receipt you log gets you closer to your refund.", action: quickUploadReceipt });
+  const todaysWin = todaysWinMessages[winMessageIndex % todaysWinMessages.length];
 
   const exportCSV = () => {
     const rows: (string | number)[][] = [["Date", "Vendor", "Category", "Amount", "Work %", "Deductible", "Filed", "Notes"]];
@@ -1841,7 +1863,7 @@ export default function App() {
 
           {tab === "overview" && (
             <div className="-mx-4 sm:-mx-6 lg:mx-0 -mt-[68px] lg:mt-0 min-h-screen lg:min-h-0 lg:rounded-3xl fade-up" style={{ backgroundColor: "#081425" }}>
-              <div className="px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-28 lg:pb-10 space-y-4">
+              <div className="px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-28 lg:pb-10">
                 <div className="lg:hidden flex items-center justify-between">
                   <img src={gloveboxLogo} alt="Glovebox" className="h-11 w-auto" />
                   <div className="relative p-2" aria-hidden="true">
@@ -1849,135 +1871,84 @@ export default function App() {
                     <span className="absolute top-2 right-2 w-2 h-2 rounded-full" style={{ backgroundColor: "#D64545" }} />
                   </div>
                 </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-white">{greeting}{activeData.profile.name ? `, ${activeData.profile.name}` : ""} 👋</h1>
-                  <p className="text-sm mt-1" style={{ color: "#AEB9CB" }}>{estimatedRefund > 0 ? "You're on track to save" : `${activeData.profile.occupation} · ${activeData.profile.fy}`}</p>
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <button
-                    onClick={quickUploadReceipt}
-                    className="flex flex-col items-start justify-center gap-2 rounded-[18px] px-3 py-3.5 text-left transition active:scale-[0.98]"
-                    style={{ backgroundColor: "#14233A", border: "1px solid rgba(255,255,255,0.10)" }}
-                  >
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}><Camera size={18} color="#fff" /></div>
-                    <div className="min-w-0">
-                      <div className="text-xs font-semibold text-white leading-tight">Scan Receipt</div>
-                      <div className="text-[11px] mt-0.5 leading-tight" style={{ color: "#AAB7CA" }}>Snap & save</div>
-                    </div>
-                  </button>
-                  <button
-                    onClick={quickLogTravel}
-                    className="flex flex-col items-start justify-center gap-2 rounded-[18px] px-3 py-3.5 text-left transition active:scale-[0.98]"
-                    style={{ backgroundColor: "#14233A", border: "1px solid rgba(255,255,255,0.10)" }}
-                  >
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}><Car size={18} color="#fff" /></div>
-                    <div className="min-w-0">
-                      <div className="text-xs font-semibold text-white leading-tight">Log Trip</div>
-                      <div className="text-[11px] mt-0.5 leading-tight" style={{ color: "#AAB7CA" }}>Track km</div>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setAssistantOpen(true)}
-                    disabled={!ASSISTANT_URL}
-                    className="flex flex-col items-start justify-center gap-2 rounded-[18px] px-3 py-3.5 text-left transition active:scale-[0.98] disabled:opacity-50"
-                    style={{ backgroundColor: "#14233A", border: "1px solid rgba(255,255,255,0.10)" }}
-                  >
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}><Sparkles size={18} color="#fff" /></div>
-                    <div className="min-w-0">
-                      <div className="text-xs font-semibold text-white leading-tight">Ask Glovebox</div>
-                      <div className="text-[11px] mt-0.5 leading-tight" style={{ color: "#AAB7CA" }}>Get answers</div>
-                    </div>
-                  </button>
-                </div>
+
+                <p className="text-center text-sm font-medium mt-3" style={{ color: "#AEB9CB" }}>{greeting}{activeData.profile.name ? `, ${activeData.profile.name}` : ""} 👋</p>
 
                 {!activeData.profile.quickSetupDone ? (
-                  <QuickSetupCard
-                    occupation={activeData.profile.occupation}
-                    income={activeData.profile.income}
-                    onSave={saveQuickSetup}
-                    dark
-                  />
-                ) : (
-                  <div className="rounded-2xl p-5" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: "#79879C" }}>
-                          Estimated Tax Position <Info size={12} />
-                        </div>
-                        <div className="text-xs mt-2" style={{ color: "#79879C" }}>Estimated refund</div>
-                        <div className="text-4xl font-bold tabular mt-0.5 text-white"><AnimatedNumber value={Math.max(0, estimatedRefund)} /></div>
-                        {weeklyDelta > 0 && (
-                          <div className="inline-flex items-center gap-1 mt-3 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: "rgba(24,195,126,0.15)", color: GREEN }}>
-                            <TrendingUp size={12} /> {fmt(weeklyDelta)} this month
-                          </div>
-                        )}
-                      </div>
-                      <div className="pt-2 pb-3">
-                        <RadialProgress pct={readyPct} label="Tax Ready" trackColor="rgba(255,255,255,0.12)" progressColor={TEAL} textColor="#fff" labelColor="#AEB9CB" />
-                      </div>
-                    </div>
-                    <div className="mt-3 -mx-1">
-                      <TrendSparkline points={weeklyDeductionsTrend} color={TEAL} />
-                    </div>
-                    <div className="mt-5 pt-4 grid grid-cols-4 gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-                      {[
-                        { icon: Wallet, label: "Income", value: fmt(income) },
-                        { icon: Landmark, label: "Tax withheld", value: fmt(withheld) },
-                        { icon: Wallet, label: "Current deductions", value: fmt(totalDeductions) },
-                        { icon: Car, label: "Vehicle method", value: "Logbook" },
-                      ].map((s) => (
-                        <div key={s.label} className="flex flex-col items-center text-center gap-1.5">
-                          <s.icon size={15} style={{ color: TEAL }} />
-                          <div className="text-[10px] leading-tight" style={{ color: "#79879C" }}>{s.label}</div>
-                          <div className="text-xs font-semibold tabular text-white">{s.value}</div>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="mt-6">
+                    <QuickSetupCard
+                      occupation={activeData.profile.occupation}
+                      income={activeData.profile.income}
+                      onSave={saveQuickSetup}
+                      dark
+                    />
                   </div>
-                )}
+                ) : (
+                  <>
+                    {/* Hero — Tax Ready is the single biggest thing on the page */}
+                    <div className="flex flex-col items-center text-center pt-8">
+                      <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#79879C" }}>Tax Ready</div>
+                      <div className="mt-5">
+                        <RadialProgress pct={readyPct} label="" size={196} stroke={15} progressColor={TEAL} trackColor="rgba(255,255,255,0.08)" textColor="#fff" valueClassName="text-5xl font-bold" />
+                      </div>
+                      <p className="text-sm mt-6 max-w-[260px] leading-relaxed" style={{ color: "#AEB9CB" }}>{readyMessage}</p>
+                    </div>
 
-                {todaysTasks.length > 0 && (
-                  <div className="rounded-2xl p-5" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-semibold text-white">Today's Tasks</span>
-                      <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ backgroundColor: "rgba(37,99,255,0.15)", color: TEAL }}>{todaysTasks.length}</span>
+                    {/* Estimated Refund — directly beneath, second-loudest number on the page */}
+                    <div className="flex flex-col items-center text-center pt-10">
+                      <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#79879C" }}>Estimated Refund</div>
+                      <div className="text-5xl font-bold tabular mt-2 text-white"><AnimatedNumber value={Math.max(0, estimatedRefund)} /></div>
+                      {weeklyDelta > 0 && (
+                        <div className="inline-flex items-center gap-1 mt-3 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: "rgba(24,195,126,0.15)", color: GREEN }}>
+                          <TrendingUp size={12} /> +{fmt(weeklyDelta)} this week
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      {todaysTasks.map((t) => (
-                        <button key={t.key} onClick={t.onGo} className="w-full flex items-center gap-3 py-3 text-left border-t first:border-t-0 disabled:opacity-50 disabled:cursor-not-allowed group" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
-                          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(37,99,255,0.15)" }}>
-                            <t.icon size={16} style={{ color: TEAL }} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-semibold text-white">{t.title}</div>
-                            <div className="text-xs mt-0.5 truncate" style={{ color: "#79879C" }}>{t.detail}</div>
-                          </div>
-                          <ChevronRight size={16} className="flex-shrink-0" style={{ color: "#3A4A66" }} />
+
+                    {/* Quick Actions — deliberately quiet: 3 items, icon-led, minimal text */}
+                    <div className="grid grid-cols-3 gap-3 mt-12">
+                      <button onClick={quickUploadReceipt} className="flex flex-col items-center gap-2.5 rounded-2xl py-5 transition active:scale-[0.98]" style={{ backgroundColor: "#14233A", border: "1px solid rgba(255,255,255,0.10)" }}>
+                        <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ backgroundColor: TEAL }}><Camera size={26} color="#fff" /></div>
+                        <div className="text-xs font-semibold text-white">Scan Receipt</div>
+                      </button>
+                      <button onClick={quickLogTravel} className="flex flex-col items-center gap-2.5 rounded-2xl py-5 transition active:scale-[0.98]" style={{ backgroundColor: "#14233A", border: "1px solid rgba(255,255,255,0.10)" }}>
+                        <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ backgroundColor: TEAL }}><Car size={26} color="#fff" /></div>
+                        <div className="text-xs font-semibold text-white">Log Trip</div>
+                      </button>
+                      <button onClick={() => setAssistantOpen(true)} disabled={!ASSISTANT_URL} className="flex flex-col items-center gap-2.5 rounded-2xl py-5 transition active:scale-[0.98] disabled:opacity-50" style={{ backgroundColor: "#14233A", border: "1px solid rgba(255,255,255,0.10)" }}>
+                        <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ backgroundColor: TEAL }}><Sparkles size={26} color="#fff" /></div>
+                        <div className="text-xs font-semibold text-white">Ask AI</div>
+                      </button>
+                    </div>
+
+                    {/* Today's Win — rotates through whichever real, computed wins currently apply */}
+                    <button onClick={todaysWin.action} className="w-full text-left rounded-2xl p-5 mt-4 flex items-center gap-3 transition active:scale-[0.99] hover:brightness-110" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(24,195,126,0.15)" }}>
+                        <TrendingUp size={18} style={{ color: GREEN }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: GREEN }}>Today's Win</div>
+                        <div key={winMessageIndex % todaysWinMessages.length} className="text-sm font-medium mt-0.5 text-white fade-up">{todaysWin.text}</div>
+                      </div>
+                      <ChevronRight size={16} className="flex-shrink-0" style={{ color: "#3A4A66" }} />
+                    </button>
+
+                    {/* AI — the same floating assistant, just proactively surfacing its next suggestion here */}
+                    {todaySuggestion && (
+                      <div className="rounded-2xl p-4 flex items-center gap-3 mt-4" style={{ backgroundColor: "#14233A", border: "1px solid rgba(255,255,255,0.10)" }}>
+                        <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(37,99,255,0.15)" }}>
+                          <Sparkles size={16} style={{ color: TEAL }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEAL }}>Glovebox AI</div>
+                          <div className="text-sm font-medium mt-0.5 text-white">{todaySuggestion.text}</div>
+                        </div>
+                        <button onClick={todaySuggestion.action} className="px-3.5 py-1.5 rounded-full text-xs font-semibold flex-shrink-0 disabled:opacity-50 transition hover:brightness-110" style={{ backgroundColor: TEAL, color: "#fff" }}>
+                          Add now
                         </button>
-                      ))}
-                    </div>
-                    {laundryTaxBenefit > 0 && (
-                      <div className="flex items-center justify-between pt-3 mt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-                        <span className="text-xs font-semibold" style={{ color: "#AEB9CB" }}>Estimated tax benefit today</span>
-                        <span className="text-sm font-bold tabular" style={{ color: GREEN }}>+{fmt(laundryTaxBenefit)}</span>
                       </div>
                     )}
-                  </div>
-                )}
-
-                {todaySuggestion && (
-                  <div className="rounded-2xl p-4 flex items-center gap-3" style={{ backgroundColor: "#14233A", border: "1px solid rgba(255,255,255,0.10)" }}>
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(37,99,255,0.15)" }}>
-                      <Sparkles size={16} style={{ color: TEAL }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEAL }}>Glovebox Insight</div>
-                      <div className="text-sm font-medium mt-0.5 text-white">{todaySuggestion.text}</div>
-                    </div>
-                    <button onClick={todaySuggestion.action} className="px-3.5 py-1.5 rounded-full text-xs font-semibold flex-shrink-0 disabled:opacity-50 transition hover:brightness-110" style={{ backgroundColor: TEAL, color: "#fff" }}>
-                      Add now
-                    </button>
-                  </div>
+                  </>
                 )}
               </div>
             </div>
@@ -1996,28 +1967,23 @@ export default function App() {
                   </div>
                 </div>
 
-                {(() => {
-                  const readyMessage = readyPct >= 0.8 ? "You're almost there! 🎉" : readyPct >= 0.4 ? "You're making great progress! 🎉" : "Let's get your claim sorted.";
-                  return (
-                    <div className="rounded-3xl p-6 text-white" style={{ background: `linear-gradient(135deg, ${NAVY} 0%, ${TEAL_DARK} 100%)` }}>
-                      <div className="text-xs font-semibold uppercase tracking-wide text-white/70">Tax Ready</div>
-                      <div className="text-5xl font-bold mt-1 tabular">{Math.round(readyPct * 100)}%</div>
-                      <div className="mt-3">
-                        <AnimatedBar pct={readyPct} color="#fff" trackColor="rgba(255,255,255,0.15)" />
+                <div className="rounded-3xl p-6 text-white" style={{ background: `linear-gradient(135deg, ${NAVY} 0%, ${TEAL_DARK} 100%)` }}>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-white/70">Tax Ready</div>
+                  <div className="text-5xl font-bold mt-1 tabular">{Math.round(readyPct * 100)}%</div>
+                  <div className="mt-3">
+                    <AnimatedBar pct={readyPct} color="#fff" trackColor="rgba(255,255,255,0.15)" />
+                  </div>
+                  <div className="text-sm mt-3 text-white/90">{readyMessage}</div>
+                  <div className="mt-4 pt-4 space-y-2.5" style={{ borderTop: "1px solid rgba(255,255,255,0.2)" }}>
+                    {taxReadySummary.map((s) => (
+                      <div key={s.label} className="flex items-center gap-2.5 text-sm">
+                        <s.icon size={15} className="text-white/70 flex-shrink-0" />
+                        <span className="flex-1">{s.label}</span>
+                        {s.done ? <CheckCircle2 size={16} className="text-white flex-shrink-0" /> : <div className="w-4 h-4 rounded-full border-2 border-white/40 flex-shrink-0" />}
                       </div>
-                      <div className="text-sm mt-3 text-white/90">{readyMessage}</div>
-                      <div className="mt-4 pt-4 space-y-2.5" style={{ borderTop: "1px solid rgba(255,255,255,0.2)" }}>
-                        {taxReadySummary.map((s) => (
-                          <div key={s.label} className="flex items-center gap-2.5 text-sm">
-                            <s.icon size={15} className="text-white/70 flex-shrink-0" />
-                            <span className="flex-1">{s.label}</span>
-                            {s.done ? <CheckCircle2 size={16} className="text-white flex-shrink-0" /> : <div className="w-4 h-4 rounded-full border-2 border-white/40 flex-shrink-0" />}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
+                    ))}
+                  </div>
+                </div>
 
                 <div className="rounded-2xl p-6 text-center" style={{ backgroundColor: "#0D1B2E", border: "1px solid rgba(255,255,255,0.08)" }}>
                   <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#79879C" }}>Estimated Refund</div>
