@@ -904,9 +904,9 @@ function FloatingActionButton({ onScan, onLogTrip, onAddExpense, onImportCsv, di
   return (
     <>
       {open && <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />}
-      <div className="fixed right-4 sm:right-6 bottom-20 lg:bottom-6 z-40 flex flex-col items-end gap-3">
+      <div className="fixed right-4 sm:right-6 top-4 lg:top-auto lg:bottom-6 z-40 flex flex-col-reverse lg:flex-col items-end gap-3">
         {open && (
-          <div className="flex flex-col items-end gap-2 mb-1">
+          <div className="flex flex-col-reverse lg:flex-col items-end gap-2">
             {items.map((it, i) => (
               <button
                 key={it.label}
@@ -946,7 +946,7 @@ function AssistantButton({ onClick, disabled }: { onClick: () => void; disabled?
       onClick={onClick}
       disabled={disabled}
       aria-label="Glovebox AI"
-      className="fixed left-4 sm:left-6 bottom-20 lg:bottom-6 z-40 w-14 h-14 rounded-full flex items-center justify-center shadow-card-hover transition disabled:opacity-50"
+      className="fixed left-4 sm:left-6 top-4 lg:top-auto lg:bottom-6 z-40 w-14 h-14 rounded-full flex items-center justify-center shadow-card-hover transition disabled:opacity-50"
       style={{ backgroundColor: NAVY }}
     >
       <Sparkles size={22} color={TEAL} />
@@ -1863,7 +1863,7 @@ export default function App() {
 
           {tab === "overview" && (
             <div className="-mx-4 sm:-mx-6 lg:mx-0 -mt-[68px] lg:mt-0 min-h-screen lg:min-h-0 lg:rounded-3xl fade-up" style={{ backgroundColor: "#081425" }}>
-              <div className="px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-28 lg:pb-10">
+              <div className="px-4 sm:px-6 lg:px-6 pt-24 lg:pt-6 pb-28 lg:pb-10">
                 <div className="lg:hidden flex items-center justify-between">
                   <img src={gloveboxLogo} alt="Glovebox" className="h-11 w-auto" />
                   <div className="relative p-2" aria-hidden="true">
@@ -1956,7 +1956,7 @@ export default function App() {
 
           {tab === "progress" && (
             <div className="-mx-4 sm:-mx-6 lg:mx-0 -mt-[68px] lg:mt-0 min-h-screen lg:min-h-0 lg:rounded-3xl fade-up" style={{ backgroundColor: "#081425" }}>
-              <div className="px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-28 lg:pb-10 space-y-4">
+              <div className="px-4 sm:px-6 lg:px-6 pt-24 lg:pt-6 pb-28 lg:pb-10 space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}>
                     <Zap size={18} color="#fff" fill="#fff" />
@@ -2070,7 +2070,7 @@ export default function App() {
           {tab === "vehicle" && (
             <>
             <div className="-mx-4 sm:-mx-6 lg:mx-0 -mt-[68px] lg:mt-0 min-h-screen lg:min-h-0 lg:rounded-3xl fade-up" style={{ backgroundColor: "#081425" }}>
-              <div className="px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-4 flex items-center justify-between">
+              <div className="px-4 sm:px-6 lg:px-6 pt-24 lg:pt-6 pb-4 flex items-center justify-between">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}>
                     <Zap size={18} color="#fff" fill="#fff" />
@@ -2387,7 +2387,7 @@ export default function App() {
 
           {tab === "expenses" && (
             <div className="-mx-4 sm:-mx-6 lg:mx-0 -mt-[68px] lg:mt-0 min-h-screen lg:min-h-0 lg:rounded-3xl fade-up" style={{ backgroundColor: "#081425" }}>
-              <div className="px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-4 flex items-center justify-between">
+              <div className="px-4 sm:px-6 lg:px-6 pt-24 lg:pt-6 pb-4 flex items-center justify-between">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}>
                     <Zap size={18} color="#fff" fill="#fff" />
@@ -2526,7 +2526,7 @@ export default function App() {
 
           {tab === "summary" && (
             <div className="-mx-4 sm:-mx-6 lg:mx-0 -mt-[68px] lg:mt-0 min-h-screen lg:min-h-0 lg:rounded-3xl fade-up print:bg-white" style={{ backgroundColor: "#081425" }}>
-              <div className="px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-28 lg:pb-10 space-y-4">
+              <div className="px-4 sm:px-6 lg:px-6 pt-24 lg:pt-6 pb-28 lg:pb-10 space-y-4">
                 <button onClick={() => setTab("progress")} className="flex items-center gap-1 text-xs font-semibold print:hidden" style={{ color: TEAL }}>
                   <ChevronRight size={13} style={{ transform: "rotate(180deg)" }} /> Back to Progress
                 </button>
@@ -2592,7 +2592,7 @@ export default function App() {
 
           {tab === "benefits" && (
             <div className="-mx-4 sm:-mx-6 lg:mx-0 -mt-[68px] lg:mt-0 min-h-screen lg:min-h-0 lg:rounded-3xl fade-up" style={{ backgroundColor: "#081425" }}>
-              <div className="px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-28 lg:pb-10">
+              <div className="px-4 sm:px-6 lg:px-6 pt-24 lg:pt-6 pb-28 lg:pb-10">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}>
                     <Zap size={18} color="#fff" fill="#fff" />
@@ -2609,7 +2609,7 @@ export default function App() {
 
           {tab === "settings" && (
             <div className="-mx-4 sm:-mx-6 lg:mx-0 -mt-[68px] lg:mt-0 min-h-screen lg:min-h-0 lg:rounded-3xl fade-up" style={{ backgroundColor: "#081425" }}>
-              <div className="px-4 sm:px-6 lg:px-6 pt-8 lg:pt-6 pb-28 lg:pb-10 space-y-4">
+              <div className="px-4 sm:px-6 lg:px-6 pt-24 lg:pt-6 pb-28 lg:pb-10 space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: TEAL }}>
                     <Zap size={18} color="#fff" fill="#fff" />
